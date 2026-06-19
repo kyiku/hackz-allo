@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { rewardKindSchema } from './reward'
+import { rewardKindSchema } from './reward.js'
 
 /** 装備品。撃破報酬に由来し、固定カタログ能力(abilityId)に紐づく。 */
 export const equipmentSchema = z.object({
