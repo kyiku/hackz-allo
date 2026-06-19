@@ -4,7 +4,7 @@
   "language": "ja",
   "created_at": "2026-06-19",
   "updated_at": "2026-06-19",
-  "phase": "design-generated",
+  "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -12,10 +12,10 @@
     },
     "design": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "tasks": {
-      "generated": false,
+      "generated": true,
       "approved": false
     }
   },
