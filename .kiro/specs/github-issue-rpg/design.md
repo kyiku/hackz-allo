@@ -44,6 +44,8 @@
 
 **設計判断**: LLM・Git・テストをすべてRunnerに集約し、Backendは「状態とリレー」に徹する。これにより秘密情報がWeb/Backendに漏れない（sp.md安全要件）。BackendとRunnerは別プロセスだが、デモ時は同一ホストで起動スクリプトから一括起動する。
 
+> **境界の訂正（Codexレビュー反映）**: GitHub APIを叩くにはPATが要るため、**issueポーリングの実体はRunnerが担う**。Backendは「ポーリングのスケジュール指示」と「結果のDB反映・WS配信」だけを持ち、GitHubへは直接アクセスしない。`Local Runner` の責務に「issue定期ポーリング」を含める。
+
 ## 2. 技術スタック & 整合
 
 | レイヤ | 採用 | 根拠 |
@@ -66,9 +68,13 @@
 ### 3.1 敵（issue）のステータス算出
 
 ```
-敵HP(最大) = AIが生成した「合格に必要なテストケース」の件数
-            （TDDのREDフェーズ＝全テスト失敗＝敵フルHP）
+敵HP(最大) = AIが生成し専用ブランチに書き込んだ「対象テストケース」の件数
+            （初回実行で全て失敗(RED)することを確認して対象集合を固定）
+攻撃(HP-1) = 対象テストが初めて failed→passed に遷移したとき
+            （同一テストの再pass・テスト再実行ではHPは減らさない）
 ```
+
+> **HP/pass整合（Codexレビュー反映）**: HPは「対象テスト集合」に限定し、各テストの初回 fail→pass 遷移のみをダメージとする。`TargetTestCase` テーブルで対象テストIDと前回状態を保持し、二重カウントを防ぐ。生成テストの**書き込み→RED確認→対象固定**を戦闘開始の前段に必須タスクとして置く（tasks 6.6）。
 
 補助ステータス（演出・難易度表示用、ルールベースで算出）:
 
@@ -108,36 +114,49 @@
 | EXP | 敵の推定難易度に比例 |
 | レベル | EXP累積で上昇 |
 | スキル/MCP装備 | 装備したスキル/MCPを次回戦闘のAgent SDK実行設定に反映（本物の能力拡張）※research.md参照 |
-| パーティ（サブエージェント数） | レベル/報酬で増加。`query()` の `agents` 定義数＝並列で挑める数。2体以上で並列委譲を有効化（複数ファイル/タスク並行）※research.md参照 |
+| パーティ（サブエージェント定義数） | レベル/報酬で増加。`query()` の `agents`（`Record<string, AgentDefinition>`）に渡せるサブエージェント定義を増やす。**定義しただけでは自動並列にならず、委譲はAI判断**。委譲の発生は subagent 開始/終了 hook で検出して演出。並列委譲は死守コア外 ※research.md参照 |
 
 ### 3.4 AIチューニング（ステータス画面で調整 → Agent SDKへ反映）
 
-ステータス画面の設定値は、次回戦闘の `ForgeAgent`（`query()` の `options`）に直接マップする。RPGの「装備・戦い方の調整」が、そのままAIの実挙動を変える。
+ステータス画面の設定値は、次回戦闘の `ForgeAgent`（**Agent SDK** `query()` の `options`）に直接マップする。RPGの「装備・戦い方の調整」が、そのままAIの実挙動を変える。
 
-| 画面の操作 | Agent SDK `options` へのマッピング |
+> **SDKの区別（Codexレビュー反映）**: APIが2系統ある。①**Agent SDK**（`@anthropic-ai/claude-agent-sdk`, 鍛冶屋=ForgeAgent）と、②**Anthropic SDK**（`@anthropic-ai/sdk`, NPC会話/HP算出/報酬生成）。構造化出力やeffortのオプション名は両者で異なるため混同しない。
+
+**① Agent SDK（ForgeAgent）のマッピング**
+
+| 画面の操作 | Agent SDK `query()` `options` |
 |---|---|
-| 思考の深さ（effort） | `output_config.effort`（low/medium/high/xhigh/max） |
+| 思考の深さ（effort） | トップレベル `effort`（実装直前に最新オプション名を確認） |
 | 使用モデル | `model`（例 `claude-opus-4-8`） |
 | 権限モード | `permissionMode`（default/acceptEdits/plan等） |
-| 使用可能ツール | `allowedTools` / `disallowedTools` |
-| 装備スキル/MCP | `skills` / `mcpServers` |
-| パーティ（サブエージェント） | `agents`（定義したサブエージェント、並列委譲） |
+| 使用可能ツール | `tools`（最小セット）＋ `disallowedTools`（明示拒否）＋ `canUseTool`（検査） |
+| 装備スキル/MCP | `mcpServers` / `plugins`（実在カタログ）。トップレベル `skills` の有無は実装直前に確認 |
+| パーティ（サブエージェント） | `agents`（`Record<string, AgentDefinition>`。定義の追加のみ。委譲はAI判断） |
+
+**② Anthropic SDK（NPC会話/HP算出/報酬生成）**: 構造化出力は `output_config.format`（Zod）、`output_config.effort`。こちらは claude-api スキル準拠で確定済み。
 
 ## 4. データモデル (SQLite)
 
 ```
-World        (id, repo_url, name, created_at)
-Enemy        (id, world_id, issue_number, title, body, max_hp, current_hp,
-              level, weakness, state, map_x, map_y, created_at)
-NpcDialogue  (id, enemy_id, summary, difficulty, files, victory_condition)  -- 事前生成キャッシュ
-Battle       (id, enemy_id, branch_name, pr_number, ci_status, state, started_at)
-TestEvent    (id, battle_id, test_name, status, at)  -- pass/failの逐次ログ
-Reward       (id, battle_id, kind, name, stats_json, acquired_at)
-Player       (id, name, exp, level, party_size)
-Equipment    (id, player_id, reward_id, slot, equipped)  -- 装備中スキル/MCP
-Loadout      (id, player_id, effort, model, permission_mode, allowed_tools_json)  -- AIチューニング設定
-WorkLog      (id, battle_id, role, content, at)  -- AI実行ログ（監査）
+World         (id, repo_url, name, created_at)
+RepoWorkspace (id, world_id, repo_path, default_branch, deps_installed, last_pull_at)  -- clone/worktree管理
+Enemy         (id, world_id, issue_number, title, body, max_hp, current_hp,
+               level, weakness, state, map_x, map_y, created_at)
+NpcDialogue   (id, enemy_id, summary, difficulty, files, victory_condition)  -- 事前生成キャッシュ
+Battle        (id, enemy_id, branch_name, pr_number, pr_url, ci_status, state, started_at)
+BattleAttempt (id, battle_id, agent_session_id, started_at, ended_at, result)  -- 再戦単位
+TargetTestCase(id, battle_id, test_case_id, last_status, counted)  -- 対象テストと前回状態(二重カウント防止)
+TestEvent     (id, battle_id, test_case_id, status, at)  -- pass/failの逐次ログ
+Spell         (id, battle_attempt_id, prompt, at)  -- 呪文(追加指示)履歴
+CiCheck       (id, battle_id, check_name, status, conclusion, at)  -- CI check-runs
+Reward        (id, battle_id, kind, name, ability_id, stats_json, acquired_at)  -- ability_id=固定カタログ参照
+Player        (id, name, exp, level, party_size)
+Equipment     (id, player_id, reward_id, slot, equipped)  -- 装備中スキル/MCP
+Loadout       (id, player_id, effort, model, permission_mode, tools_json)  -- AIチューニング設定
+WorkLog       (id, battle_id, role, content_redacted, at)  -- AI実行ログ(秘密情報をredactして保存)
 ```
+
+**能力カタログ（コード定数）**: 報酬で付与する skill/MCP は、実在する固定カタログ（`ability_id` → 実 skill_id / mcp_id / plugin）に対応づける。LLMは表示名・性能テキストのみ生成し、`ability_id` は既存カタログから選ぶ。MVPは3個程度に限定。
 
 **不変条件**: ゲーム状態の真実はBackendのDB。RunnerはイベントをBackendに送り、Backendが永続化する。WebはDBの投影を受け取るのみ。
 
@@ -169,14 +188,18 @@ Backend ⇄ Web（および Runner → Backend）で流すイベント（方向�
 | `world.assignments` | →Web | アサイン中issue（進行中/未着手）一覧 |
 | `cmd.loadout.equip` | Web→ | スキル/MCPの装備・解除 |
 | `cmd.loadout.tune` | Web→ | AIチューニング（effort/model/permission/tools/party） |
+| `cmd.connect` | Web→ | リポジトリURL接続要求 |
+| `connect.error` | →Web | 認証/権限エラー通知（5.1） |
+| `npc.dialogue` | →Web | NPC会話（要点/難所/ファイル/勝利条件） |
 
 ## 7. 安全・運用設計
 
-- **コマンド制限**: Agent SDKの権限制御 ＋ Runner側の実行ホワイトリストで二重化。※research.md参照
-- **専用ブランチ**: `forge/issue-<n>-<timestamp>` 形式。mainへ直接pushしない。
+- **コマンド制限（訂正）**: `allowedTools` は「自動承認」であり制限ではない。制限は **`tools` を最小セットに絞る ＋ `disallowedTools` で明示拒否 ＋ `canUseTool` でコマンド/引数/パス単位に検査**（`updatedInput`で書換可）＋ `PreToolUse` フックの多段で行う。
+- **npm test 迂回対策**: AIが `package.json` の test スクリプトを書き換えると制限を迂回しうる。→ デモrepo限定、実行コマンド固定、`package.json` script変更の検知、使い捨て worktree、env redaction を併用。
+- **専用ブランチ**: `forge/issue-<n>-<timestamp>` 形式。最新mainから作成。mainへ直接pushしない。
 - **auto-merge**: CI成功をゲート。CIが品質ゲートとして「差分確認なしmerge禁止」を代替。※research.md参照
-- **作業ログ**: 全AI実行ログをWorkLogテーブルに保存。
-- **緊急停止**: `cmd.stop`でRunnerの実行中Agentセッションを中断。
+- **作業ログ（redaction）**: AI実行ログを保存する際、tool出力/stderr に含まれうるトークン・環境変数を redact してから WorkLog に保存。raw ログの閲覧は制限。
+- **緊急停止**: `cmd.stop`でRunnerの実行中Agentセッションを `interrupt()` で中断。
 
 ## 8. コンポーネント & インターフェース契約
 
@@ -189,7 +212,7 @@ Runnerを責務ごとに小さなモジュールへ分割する（高凝集・�
 - **方式**（research.md トピック1）:
   - `prompt` に **AsyncGenerator** を渡してストリーミング入力モードで起動。初回メッセージはissue＋TDD指示。
   - 呪文は外部キュー（WSの `cmd.spell`）→ジェネレータが `yield` で実行中セッションへ追加。
-  - `options`: `cwd`=対象repoのワークツリー、`model`=`claude-opus-4-8`、`allowedTools`＋`canUseTool`＋`PreToolUse`フックでコマンド制限、`mcpServers`/`skills`=装備中の報酬を注入。
+  - `options`: `cwd`=対象repoのワークツリー、`model`=`claude-opus-4-8`、コマンド制限は `tools`最小化＋`disallowedTools`＋`canUseTool`＋`PreToolUse`フック（`allowedTools`は自動承認用であり制限ではない点に注意）、`mcpServers`/`plugins`/`agents`=装備中の報酬カタログを注入。
   - `for await` で `SDKMessage` を受け、`assistant`内の`tool_use`を `battle.log`（RPG風抽象化）へ変換してemit。
   - `interrupt()` を `cmd.stop` にマップ（緊急停止）。
 - **インターフェース（概念）**:
@@ -210,10 +233,16 @@ Runnerを責務ごとに小さなモジュールへ分割する（高凝集・�
 
 - **何をする**: テストを別プロセスで実行し、pass/fail件数を逐次emit（1pass=HP-1）。
 - **依存**: `child_process.spawn`、Vitest/Jestカスタムレポーター。
-- **方式**（research.md トピック2-4/2-5）:
-  - 対象repoのランナーを検出。Vitest/Jest → 専用Reporterの `onTestCaseResult` でpassイベントをemit（第一選択）。
-  - 未知ランナー → `npm test` の stdoutを `spawn`＋`readline`でパース（フォールバック、`CI=true`で安定化）。
-- **契約**: `watch(repoPath) -> EventEmitter('pass'|'fail'|'done')`。
+- **方式**（research.md トピック2-4/2-5・Codexレビュー反映）:
+  - **死守コアは Vitest 固定**。専用Reporterの `onTestCaseResult` で per-test の結果をemit。Jest対応・stdoutパースは後段フォールバック（デモ外）。
+  - **二重カウント防止**: `TargetTestCase` の `test_case_id` と `last_status` を参照し、対象テストの初回 `failed→passed` のみ HP-1。再実行・再passは無視。
+- **契約**: `watch(repoPath, targetTestIds) -> EventEmitter('pass'|'fail'|'done')`（passは初回遷移のみ）。
+
+### 8.3b RepoWorkspace（リポジトリ作業環境の管理）
+
+- **何をする**: 対象repoのclone/pull、最新mainからの作業ブランチ作成、依存インストール（キャッシュ）、dirty state検査、使い捨て worktree の作成/破棄、ブランチ後始末。これが無いと ForgeAgent/TestWatcher/GitHubGateway が動かない。
+- **依存**: simple-git、`child_process`（依存インストール）。
+- **契約**: `ensureCloned(repoUrl) -> repoPath`、`prepareWorktree(branch) -> worktreePath`、`installDeps(path)`、`assertClean(path)`、`dispose(worktree)`。
 
 ### 8.4 GitHubGateway（Git/PR/CI/merge）
 
@@ -221,14 +250,15 @@ Runnerを責務ごとに小さなモジュールへ分割する（高凝集・�
 - **依存**: simple-git（ローカルgit）＋ Octokit/gh（PR・auto-merge・CI）。PATはRunner環境変数。
 - **方式**（research.md トピック2）:
   - ブランチ `forge/issue-<n>-<ts>` をsimple-gitで作成・commit・push（mainへ直接pushしない）。
-  - PR作成（Octokit `POST /pulls` or `gh pr create`）。
-  - **auto-merge**: `enablePullRequestAutoMerge`(GraphQL, PR node_id, SQUASH) を試行。**422時は握りつぶさず**、CIポーリング(`gh pr checks --watch --json` or REST check-runs)→成功→通常マージ(SQUASH)へフォールバック。
-  - **撃破確定**: CI成功（check-runs の conclusion=success）で確定。
-- **契約**: `createBranch / commit / push / openPr / pollCi / autoMergeOrFallback`。
+  - PR作成（Octokit `POST /pulls` or `gh pr create`）。**PR本文に `Fixes #<issue番号>`** を入れ、merge時にissueを自動close（無ければmerge後に issue close API）。
+  - **auto-merge（フォールバック拡張）**: `enablePullRequestAutoMerge`(GraphQL, PR node_id, SQUASH) を試行。**失敗は422に限らない**（Allow auto-merge無効/権限不足/required checks未設定/レビュー要求/merge queue/conflict）。失敗全般を捕捉し、CIポーリング(`gh pr checks --watch --json` / REST check-runs)で**必須チェックの成功を確認**→マージ可能なら通常SQUASHマージ、不可なら未撃破のまま維持。**「checksが1つも無い」状態は成功扱いにしない**。
+  - **撃破確定**: 必須CI checkの conclusion=success で確定。
+- **契約**: `createBranch / commit / push / openPr(withClosingKeyword) / pollCi / autoMergeOrFallback / ensureIssueClosed`。
 
 ### 8.5 RewardForge（報酬生成）& Equipment（装備）
 
-- **何をする**: 撃破時、実装差分(diff)からLLMで武器/防具/スキル名・性能を生成。EXP付与・レベル更新。装備中スキル/MCPを `ForgeAgent` の `options` に反映。
+- **何をする**: 撃破時、実装差分(diff)からLLMで武器/防具/スキルの**表示名・性能テキスト**を生成し、**実在する固定能力カタログ（`ability_id`→実 skill_id/mcp_id/plugin）**に対応づける。EXP付与・レベル更新。装備中の能力を `ForgeAgent` の `options`（`mcpServers`/`plugins`/`agents`）に反映。
+- **注意（Codexレビュー反映）**: LLMは名前だけを作り、実能力は必ずカタログ参照。MVPはカタログ3個程度に限定し「装備すると次戦で本当に挙動が変わる」を1つは確実に成立させる。
 - **依存**: `@anthropic-ai/sdk`（構造化出力）、GitHubGateway（diff取得）。
 - **契約**: `generateReward(diff) -> Reward`、`equip(playerId, rewardId)`。
 
@@ -279,4 +309,6 @@ Runnerを責務ごとに小さなモジュールへ分割する（高凝集・�
 - **Vitest Reporter APIの変更**: minor版でフック形が変わりうる。→ バージョン固定し、未知ランナーはstdoutフォールバック。
 - **fine-grained PATの `Checks` 権限名**: 実装直前に公式権限表で確認。
 - **デモ用repoのCI設計**: auto-mergeが効くよう required status checks を設定したVitest＋GitHub Actions構成を新規作成（requirements §8）。
+
+> **Codexレビュー反映済み（gpt-5.5, 一次情報照合）**: REDフェーズの欠落、HP二重カウント、`agents`＝パーティ人数の誤解、`allowedTools`の誤用、RepoWorkspace欠落、Backend/PAT境界矛盾、issue close保証、auto-merge失敗要因の拡張、ログredaction、SDK API名の分離を要件/設計/タスクへ反映。レビュー原文は `review-request.md` のプロンプトで再現可能。
 ```
