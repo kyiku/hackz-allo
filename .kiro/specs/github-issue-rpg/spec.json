@@ -4,14 +4,14 @@
   "language": "ja",
   "created_at": "2026-06-19",
   "updated_at": "2026-06-19",
-  "phase": "requirements",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {
