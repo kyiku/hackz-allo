@@ -108,6 +108,20 @@
 | EXP | 敵の推定難易度に比例 |
 | レベル | EXP累積で上昇 |
 | スキル/MCP装備 | 装備したスキル/MCPを次回戦闘のAgent SDK実行設定に反映（本物の能力拡張）※research.md参照 |
+| パーティ（サブエージェント数） | レベル/報酬で増加。`query()` の `agents` 定義数＝並列で挑める数。2体以上で並列委譲を有効化（複数ファイル/タスク並行）※research.md参照 |
+
+### 3.4 AIチューニング（ステータス画面で調整 → Agent SDKへ反映）
+
+ステータス画面の設定値は、次回戦闘の `ForgeAgent`（`query()` の `options`）に直接マップする。RPGの「装備・戦い方の調整」が、そのままAIの実挙動を変える。
+
+| 画面の操作 | Agent SDK `options` へのマッピング |
+|---|---|
+| 思考の深さ（effort） | `output_config.effort`（low/medium/high/xhigh/max） |
+| 使用モデル | `model`（例 `claude-opus-4-8`） |
+| 権限モード | `permissionMode`（default/acceptEdits/plan等） |
+| 使用可能ツール | `allowedTools` / `disallowedTools` |
+| 装備スキル/MCP | `skills` / `mcpServers` |
+| パーティ（サブエージェント） | `agents`（定義したサブエージェント、並列委譲） |
 
 ## 4. データモデル (SQLite)
 
@@ -119,8 +133,9 @@ NpcDialogue  (id, enemy_id, summary, difficulty, files, victory_condition)  -- �
 Battle       (id, enemy_id, branch_name, pr_number, ci_status, state, started_at)
 TestEvent    (id, battle_id, test_name, status, at)  -- pass/failの逐次ログ
 Reward       (id, battle_id, kind, name, stats_json, acquired_at)
-Player       (id, name, exp, level)
+Player       (id, name, exp, level, party_size)
 Equipment    (id, player_id, reward_id, slot, equipped)  -- 装備中スキル/MCP
+Loadout      (id, player_id, effort, model, permission_mode, allowed_tools_json)  -- AIチューニング設定
 WorkLog      (id, battle_id, role, content, at)  -- AI実行ログ（監査）
 ```
 
@@ -150,6 +165,10 @@ Backend ⇄ Web（および Runner → Backend）で流すイベント（方向�
 | `cmd.stop` | Web→ | battleId（緊急停止） |
 | `tavern.issueDraft` | →Web | issue案 |
 | `cmd.tavern.publish` | Web→ | issue案の確定登録 |
+| `player.status` | →Web | EXP/レベル/撃破履歴/武器コレクション/パーティ数 |
+| `world.assignments` | →Web | アサイン中issue（進行中/未着手）一覧 |
+| `cmd.loadout.equip` | Web→ | スキル/MCPの装備・解除 |
+| `cmd.loadout.tune` | Web→ | AIチューニング（effort/model/permission/tools/party） |
 
 ## 7. 安全・運用設計
 
@@ -224,6 +243,19 @@ Runnerを責務ごとに小さなモジュールへ分割する（高凝集・�
 - **何をする**: ユーザー要望＋コード分析からissue案（タイトル/本文/ラベル）を生成し提示。確定でGitHubに登録。
 - **依存**: `@anthropic-ai/sdk`、GitHubGateway（コード参照・issue登録）。
 - **契約**: `draftIssue(request, repoContext) -> IssueDraft`、`publishIssue(draft)`。
+
+### 8.9 Loadout（編成/AIチューニング）
+
+- **何をする**: 装備（スキル/MCP）、AIチューニング（effort/model/permissionMode/tools）、パーティ（サブエージェント数）を保持・更新し、次回戦闘の `ForgeAgent` 実行設定に反映する。
+- **依存**: Backend DB（Equipment/Player）、ForgeAgent（§8.1）。
+- **方式**（§3.4・research.md トピック1）: 設定をDBに保存し、戦闘開始時に `query()` の `options`（`skills`/`mcpServers`/`output_config.effort`/`model`/`permissionMode`/`allowedTools`/`agents`）へ組み立てる。サブエージェント数は `agents` 定義数で表現し、2体以上で並列委譲を有効化。
+- **契約**: `getLoadout(playerId)`、`updateLoadout(playerId, patch)`、`buildAgentOptions(loadout) -> AgentOptions`、`partySize(player) -> number`（レベル/報酬から算出）。
+
+### 8.10 StatusScreen（フロント）
+
+- **何をする**: ステータス画面の描画と操作。装備付け替え、AIチューニングUI、プレイヤー状態閲覧、アサインissue一覧、パーティ表示。
+- **依存**: WSクライアント、Loadout（§8.9）、Backend（状態投影）。
+- **契約**: §6のWSイベント（`cmd.loadout.equip`/`cmd.loadout.tune`）を送出、`player.status`/`world.assignments` を受信して表示。
 
 ### 8.8 Backend（WSハブ / DB / ポーリング）
 
