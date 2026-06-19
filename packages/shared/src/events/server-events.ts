@@ -1,0 +1,43 @@
+import { z } from 'zod'
+import { assignmentSchema, battleLogKindSchema } from '../domain/battle'
+import { enemySchema } from '../domain/enemy'
+import { loadoutSchema, playerSchema } from '../domain/player'
+import { rewardSchema } from '../domain/reward'
+import { worldSchema } from '../domain/world'
+
+/**
+ * サーバー→クライアント(S→C)のWSイベント。
+ * requirements.md §6 イベント表に準拠する。
+ */
+export const serverEventSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('world.state'), world: worldSchema, enemies: z.array(enemySchema) }),
+  z.object({ type: z.literal('enemy.appeared'), enemy: enemySchema }),
+  z.object({ type: z.literal('enemy.removed'), enemyId: z.number().int() }),
+  z.object({
+    type: z.literal('battle.started'),
+    battleId: z.string(),
+    enemyId: z.number().int(),
+    hpTotal: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal('battle.hp_changed'),
+    battleId: z.string(),
+    hpCurrent: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal('battle.log'),
+    battleId: z.string(),
+    line: z.string(),
+    kind: battleLogKindSchema,
+  }),
+  z.object({
+    type: z.literal('battle.defeated'),
+    battleId: z.string(),
+    enemyId: z.number().int(),
+    reward: rewardSchema,
+  }),
+  z.object({ type: z.literal('battle.failed'), battleId: z.string(), reason: z.string() }),
+  z.object({ type: z.literal('player.status'), player: playerSchema, loadout: loadoutSchema }),
+  z.object({ type: z.literal('world.assignments'), assignments: z.array(assignmentSchema) }),
+])
+export type ServerEvent = z.infer<typeof serverEventSchema>
