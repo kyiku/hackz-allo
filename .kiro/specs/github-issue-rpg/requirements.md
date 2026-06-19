@@ -85,10 +85,11 @@ GitHubリポジトリを1つのRPGワールドに変換し、open issue を敵�
 
 **ユーザーストーリー:** 開発者として、ボタン1つでAIにissueを解決させ、その過程をRPGの戦闘として見たい。
 
-- WHEN プレイヤーが鍛冶屋にissueを依頼する THE SYSTEM SHALL 当該issueの合格に必要なテストケースをAIで生成し、その件数を敵のHP（最大HP）として設定する
-- WHEN 戦闘が開始される THE SYSTEM SHALL Runner上で専用ブランチを作成し、Claude Code CLIによるTDD実装を開始する
-- WHILE テストが実行されている THE SYSTEM SHALL passしたテスト件数をWebSocketでリアルタイムに配信する
-- WHEN テストが1件passする THE SYSTEM SHALL 敵のHPを1減らす演出を行う
+- WHEN プレイヤーが鍛冶屋にissueを依頼する THE SYSTEM SHALL 当該issueの合格に必要なテストケースをAIで生成し、専用ブランチに書き込む
+- WHEN 生成テストを書き込んだ THE SYSTEM SHALL 初回実行で全テストが失敗（RED）することを確認し、その対象テスト集合を固定する（敵HP=対象テスト件数）
+- WHEN 戦闘が開始される THE SYSTEM SHALL Runner上の専用ブランチでAIによるTDD実装を開始する
+- WHILE テストが実行されている THE SYSTEM SHALL 対象テストのpass状況をWebSocketでリアルタイムに配信する
+- WHEN 対象テストが初めて failed→passed に遷移する THE SYSTEM SHALL 敵のHPを1減らす（同一テストの再pass・再実行ではHPを減らさない）
 - THE SYSTEM SHALL Runnerの実行ログ（実機ターミナル出力）をRPG風に抽象化してWebに表示する（任意で実出力を確認できる小窓を設ける）
 - THE SYSTEM SHALL main ブランチへ直接 push してはならない
 
@@ -112,6 +113,7 @@ GitHubリポジトリを1つのRPGワールドに変換し、open issue を敵�
 **ユーザーストーリー:** 開発者として、CIが通った変更だけが安全に取り込まれてほしい。
 
 - WHEN 全テストがpassする THE SYSTEM SHALL commit を作成し、専用ブランチからPRを作成する
+- THE SYSTEM SHALL PR本文に closing keyword（`Fixes #<issue番号>` 等）を含め、merge時に対応issueが自動closeされるようにする
 - WHEN CIが成功する THE SYSTEM SHALL 敵の撃破を確定する
 - WHEN CIが成功している THE SYSTEM SHALL CI成功をゲートとして当該PRをauto-mergeする
 - IF CIが失敗している THEN THE SYSTEM SHALL auto-mergeを行わず、敵を未撃破のまま維持する
@@ -143,8 +145,9 @@ GitHubリポジトリを1つのRPGワールドに変換し、open issue を敵�
 - THE SYSTEM SHALL ステータス画面で、AIの戦い方（思考の深さ=effort、使用モデル、権限モード、使用可能ツール）を調整できるようにし、次回戦闘の実行設定に反映する
 - THE SYSTEM SHALL プレイヤー状態（EXP、レベル、撃破履歴、獲得武器コレクション）を閲覧できるようにする
 - THE SYSTEM SHALL 現在アサインされているissue（進行中/未着手の敵）の一覧を閲覧できるようにする
-- THE SYSTEM SHALL 編成として、使用可能なサブエージェント数（パーティ人数）を表示し、成長（レベル/報酬）に応じて増加させる
-- WHEN サブエージェント数が2以上のとき THE SYSTEM SHALL 戦闘でサブエージェントへの並列委譲を有効化する（複数ファイル/タスクの並行処理）
+- THE SYSTEM SHALL 編成として、使用可能なサブエージェント定義の数（パーティ人数）を表示し、成長（レベル/報酬）に応じて増やす
+- WHEN パーティが2体以上のとき THE SYSTEM SHALL 利用可能なサブエージェント定義を `query()` の `agents` に渡し、AIが委譲できる選択肢を増やす（実際の委譲はAI判断による。委譲の発生は subagent 開始/終了 hook で検出し演出する）
+- 注記: サブエージェントの「並列委譲」は死守コアには含めない（演出として後段で対応）
 
 ## 6. 非機能要件
 
