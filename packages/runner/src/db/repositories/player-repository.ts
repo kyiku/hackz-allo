@@ -1,5 +1,5 @@
 import type { Player } from '@github-issue-rpg/shared'
-import type { Db } from '../database'
+import type { Db } from '../database.js'
 
 interface PlayerRow {
   id: number

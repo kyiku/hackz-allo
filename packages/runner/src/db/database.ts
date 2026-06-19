@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import { SCHEMA_SQL } from './schema'
+import { SCHEMA_SQL } from './schema.js'
 
 /** better-sqlite3 の Database 型エイリアス。 */
 export type Db = Database.Database

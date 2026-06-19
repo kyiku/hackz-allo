@@ -1,8 +1,8 @@
-import { clientEventSchema, type ClientEvent } from './client-events'
-import { serverEventSchema, type ServerEvent } from './server-events'
+import { clientEventSchema, type ClientEvent } from './client-events.js'
+import { serverEventSchema, type ServerEvent } from './server-events.js'
 
-export { clientEventSchema, type ClientEvent } from './client-events'
-export { serverEventSchema, type ServerEvent } from './server-events'
+export { clientEventSchema, type ClientEvent } from './client-events.js'
+export { serverEventSchema, type ServerEvent } from './server-events.js'
 
 /** 全WSイベント（双方向）。 */
 export type WSEvent = ServerEvent | ClientEvent

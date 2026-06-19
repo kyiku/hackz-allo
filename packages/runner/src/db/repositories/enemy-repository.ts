@@ -1,5 +1,5 @@
 import type { Difficulty, Enemy, EnemyStatus } from '@github-issue-rpg/shared'
-import type { Db } from '../database'
+import type { Db } from '../database.js'
 
 interface EnemyRow {
   id: number

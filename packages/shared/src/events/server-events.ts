@@ -1,9 +1,9 @@
 import { z } from 'zod'
-import { assignmentSchema, battleLogKindSchema } from '../domain/battle'
-import { enemySchema } from '../domain/enemy'
-import { loadoutSchema, playerSchema } from '../domain/player'
-import { rewardSchema } from '../domain/reward'
-import { worldSchema } from '../domain/world'
+import { assignmentSchema, battleLogKindSchema } from '../domain/battle.js'
+import { enemySchema } from '../domain/enemy.js'
+import { loadoutSchema, playerSchema } from '../domain/player.js'
+import { rewardSchema } from '../domain/reward.js'
+import { worldSchema } from '../domain/world.js'
 
 /**
  * サーバー→クライアント(S→C)のWSイベント。
