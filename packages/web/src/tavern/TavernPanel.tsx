@@ -18,11 +18,21 @@ interface TavernPanelProps {
 export function TavernPanel({ draft, onTalk, onPublish }: TavernPanelProps) {
   const [message, setMessage] = useState('')
   const [published, setPublished] = useState(false)
+  // 相談送信後、issue案が返るまでの「考え中」状態。
+  const [thinking, setThinking] = useState(false)
 
-  // 新しい issue 案が届いたら登録済みフラグをリセットする。
+  // 新しい issue 案が届いたら登録済みフラグと考え中表示を解除する。
   useEffect(() => {
     setPublished(false)
+    setThinking(false)
   }, [draft])
+
+  // 応答が来ないまま固まらないよう、一定時間で考え中表示を自動解除する保険。
+  useEffect(() => {
+    if (!thinking) return
+    const timer = setTimeout(() => setThinking(false), 60000)
+    return () => clearTimeout(timer)
+  }, [thinking])
 
   function talk(event: FormEvent) {
     event.preventDefault()
@@ -30,6 +40,7 @@ export function TavernPanel({ draft, onTalk, onPublish }: TavernPanelProps) {
     if (!trimmed) return
     onTalk(trimmed)
     setMessage('')
+    setThinking(true)
   }
 
   function publish() {
@@ -49,13 +60,21 @@ export function TavernPanel({ draft, onTalk, onPublish }: TavernPanelProps) {
         <input
           value={message}
           onChange={(event) => setMessage(event.target.value)}
+          disabled={thinking}
           placeholder="どんな課題を解決したい？（例: ログイン処理が遅い）"
-          className="rpg-input flex-1"
+          className="rpg-input flex-1 disabled:opacity-40"
         />
-        <button type="submit" className="rpg-btn rpg-btn-amber">
-          相談する
+        <button type="submit" disabled={thinking} className="rpg-btn rpg-btn-amber disabled:opacity-40">
+          {thinking ? '相談中…' : '相談する'}
         </button>
       </form>
+
+      {thinking && (
+        <p className="flex items-center gap-2 text-sm text-rpg-muted" role="status" aria-live="polite">
+          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-rpg-frame/40 border-t-rpg-gold" />
+          マスターが考えています…
+        </p>
+      )}
 
       {draft && (
         <div className="rpg-panel flex flex-col gap-2 p-3">
