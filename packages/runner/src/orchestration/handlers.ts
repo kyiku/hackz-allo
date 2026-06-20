@@ -1,4 +1,13 @@
-import type { ConnectErrorReason, Enemy, IssueDraft, LoadoutTuning } from '@github-issue-rpg/shared'
+import {
+  getAbility,
+  type Ability,
+  type ConnectErrorReason,
+  type Enemy,
+  type IssueDraft,
+  type LoadoutTuning,
+  type Reward,
+  type RewardKind,
+} from '@github-issue-rpg/shared'
 import type { StructuredGenerator } from '../ai/structured-generator.js'
 import type { EquipmentRepository } from '../db/repositories/equipment-repository.js'
 import type { LoadoutRepository } from '../db/repositories/loadout-repository.js'
@@ -15,6 +24,13 @@ import {
 } from '../world/index.js'
 import type { BackendClient } from './backend-client.js'
 import type { JobHandlers } from './dispatcher.js'
+
+/** 能力種別を装備（報酬）の kind へ対応づける（表示上の区別。実効果は abilityId が担う）。 */
+function rewardKindForAbility(kind: Ability['kind']): RewardKind {
+  if (kind === 'mcp') return 'armor'
+  if (kind === 'plugin') return 'weapon'
+  return 'skill'
+}
 
 /** GitHub取得エラーのHTTPステータスを connect.error の reason へ分類する。 */
 function classifyConnectError(error: unknown): ConnectErrorReason {
@@ -181,6 +197,36 @@ export function createJobHandlers(ctx: JobContext): JobHandlers {
           message: error instanceof Error ? error.message : 'リポジトリ接続に失敗しました',
         })
       }
+    },
+
+    async onRewardClaim(abilityIds: string[]): Promise<void> {
+      // 神経衰弱で当てた能力を装備として付与し、即座に装備状態にする（次戦のAIに効く）。
+      // カタログに無いIDは無視する（不正な強化を弾く）。
+      const now = new Date().toISOString()
+      const newEquipmentIds: number[] = []
+      for (const id of abilityIds) {
+        const ability = getAbility(id)
+        if (!ability) continue
+        const reward: Reward = {
+          kind: rewardKindForAbility(ability.kind),
+          name: ability.displayName,
+          description: ability.description,
+          abilityId: ability.id,
+        }
+        const equipment = ctx.equipment.createFromReward(ctx.playerId, reward, now)
+        newEquipmentIds.push(equipment.id)
+      }
+      if (newEquipmentIds.length === 0) {
+        await emitPlayerStatus()
+        return
+      }
+      const loadout = ctx.loadouts.getByPlayer(ctx.playerId)
+      if (!loadout) {
+        throw new Error(`Loadout not found: player=${ctx.playerId}`)
+      }
+      const equippedIds = [...new Set([...loadout.equippedIds, ...newEquipmentIds])]
+      ctx.loadouts.update(ctx.playerId, { equippedIds, partySize: loadout.partySize })
+      await emitPlayerStatus()
     },
   }
 }

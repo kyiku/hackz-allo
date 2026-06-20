@@ -42,6 +42,27 @@ export const ABILITY_CATALOG: readonly Ability[] = [
     displayName: '整地の杖',
     description: '不要コードの整理とリファクタを促すプラグイン。',
   },
+  {
+    id: 'ability.security-skill',
+    kind: 'skill',
+    ref: 'security-review',
+    displayName: '防壁の心得',
+    description: '入力検証・インジェクション対策など安全側の実装を徹底する。',
+  },
+  {
+    id: 'ability.perf-skill',
+    kind: 'skill',
+    ref: 'performance',
+    displayName: '俊足の心得',
+    description: '無駄な確保やループを避け、性能を意識した実装を促す。',
+  },
+  {
+    id: 'ability.context7-mcp',
+    kind: 'mcp',
+    ref: 'context7',
+    displayName: '叡智の書物',
+    description: 'context7 MCPで最新ライブラリ知識を参照して実装精度を上げる。',
+  },
 ]
 
 const CATALOG_BY_ID = new Map(ABILITY_CATALOG.map((ability) => [ability.id, ability]))

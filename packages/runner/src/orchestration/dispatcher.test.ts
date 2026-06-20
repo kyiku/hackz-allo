@@ -12,6 +12,7 @@ function handlers() {
     onLoadoutTune: vi.fn(async () => {}),
     onNpcTalk: vi.fn(async () => {}),
     onConnect: vi.fn(async () => {}),
+    onRewardClaim: vi.fn(async () => {}),
   }
 }
 
@@ -41,6 +42,15 @@ describe('createJobDispatcher', () => {
     expect(h.onStop).toHaveBeenCalledWith('b1')
     expect(h.onTavern).toHaveBeenCalledWith('バグ直したい')
     expect(h.onConnect).toHaveBeenCalledWith('https://github.com/k/r')
+  })
+
+  it('cmd.reward.claim を onRewardClaim に振り分ける', async () => {
+    const h = handlers()
+    await createJobDispatcher(h).dispatch({
+      type: 'cmd.reward.claim',
+      abilityIds: ['ability.tdd-skill'],
+    })
+    expect(h.onRewardClaim).toHaveBeenCalledWith(['ability.tdd-skill'])
   })
 
   it('cmd.tavern.publish を onTavernPublish に振り分ける', async () => {

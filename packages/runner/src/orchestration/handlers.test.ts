@@ -33,7 +33,12 @@ function makeContext(loadout?: Loadout): {
     },
     loadouts,
     equipment: {
-      createFromReward: vi.fn(),
+      createFromReward: vi.fn((_playerId: number, reward: { name: string; abilityId: string | null }) => ({
+        id: 100,
+        kind: 'skill',
+        name: reward.name,
+        abilityId: reward.abilityId,
+      })),
       listByPlayer: vi.fn(() => []),
     },
     generator: { generate },
@@ -130,6 +135,30 @@ describe('createJobHandlers - tavern', () => {
       createJobHandlers(ctx).onTavernPublish({ title: 't', body: 'b', labels: [] }),
     ).rejects.toThrow(/未接続/)
     expect(ctx.createIssue).not.toHaveBeenCalled()
+  })
+})
+
+describe('createJobHandlers - reward claim', () => {
+  it('onRewardClaim はカタログ能力を装備化し自動装備して player.status を配信する', async () => {
+    const { ctx, loadouts } = makeContext({ equippedIds: [], partySize: 1 })
+    await createJobHandlers(ctx).onRewardClaim(['ability.tdd-skill'])
+
+    expect(ctx.equipment.createFromReward).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ abilityId: 'ability.tdd-skill', kind: 'skill' }),
+      expect.any(String),
+    )
+    expect(loadouts.update).toHaveBeenCalledWith(1, { equippedIds: [100], partySize: 1 })
+    expect(ctx.backend.emit).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'player.status' }),
+    )
+  })
+
+  it('カタログに無い能力IDは無視する（不正強化を弾く）', async () => {
+    const { ctx, loadouts } = makeContext()
+    await createJobHandlers(ctx).onRewardClaim(['ability.bogus'])
+    expect(ctx.equipment.createFromReward).not.toHaveBeenCalled()
+    expect(loadouts.update).not.toHaveBeenCalled()
   })
 })
 

@@ -16,6 +16,7 @@ export interface JobHandlers {
   onLoadoutTune(tuning: LoadoutTuning): Promise<void>
   onNpcTalk(enemyId: number): Promise<void>
   onConnect(repoUrl: string): Promise<void>
+  onRewardClaim(abilityIds: string[]): Promise<void>
 }
 
 export interface JobDispatcher {
@@ -45,6 +46,8 @@ export function createJobDispatcher(handlers: JobHandlers): JobDispatcher {
           return handlers.onNpcTalk(event.enemyId)
         case 'cmd.connect':
           return handlers.onConnect(event.repoUrl)
+        case 'cmd.reward.claim':
+          return handlers.onRewardClaim(event.abilityIds)
         default: {
           const exhaustive: never = event
           throw new Error(`未知のクライアントイベント: ${JSON.stringify(exhaustive)}`)
