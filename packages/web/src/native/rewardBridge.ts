@@ -24,8 +24,8 @@ export function hasNativeBridge(): boolean {
   return Boolean(w.webkit?.messageHandlers?.bridge)
 }
 
-/** 報酬カード候補。既定はカタログ全15種（神経衰弱の30枚＝15ペア）。 */
-export function rewardCandidates(seed: number, count = 15): RewardAbility[] {
+/** 報酬カード候補。既定は5種（神経衰弱の10枚＝5ペア）。敵番号をシードに選ぶ。 */
+export function rewardCandidates(seed: number, count = 5): RewardAbility[] {
   const list = ABILITY_CATALOG
   const out: RewardAbility[] = []
   const total = list.length

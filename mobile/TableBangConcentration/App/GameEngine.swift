@@ -40,9 +40,9 @@ final class GameEngine: ObservableObject {
     static func reward(specs: [RewardCardSpec], maxSwings: Int = 3) -> GameEngine {
         var config = GameConfig.default
         config.maxSwings = maxSwings
-        // 30枚（6列×5行）が盤面に収まるサイズ。
-        config.cardSize = SIMD3<Float>(0.045, 0.003, 0.06)
-        config.cardSpacing = 0.07
+        // 10枚（5列×2行）想定。見やすい大きさ（6×8cm）に。
+        config.cardSize = SIMD3<Float>(0.06, 0.003, 0.08)
+        config.cardSpacing = 0.092
         return GameEngine(config: config, rewardSpecs: specs)
     }
 
@@ -123,7 +123,7 @@ final class GameEngine: ObservableObject {
 
     /// 平面検出に頼らず、カメラ前方（少し下）に盤面を置いてプレイ開始する。
     /// 「目の前に置く」フォールバック。平面が出ない/見つけにくい場面でも確実に札を出す。
-    func placeBoardInFront(distance: Float = 0.7, drop: Float = 0.3) {
+    func placeBoardInFront(distance: Float = 0.6, drop: Float = 0.25) {
         let camera = scene.arView.cameraTransform
         let zAxis = camera.matrix.columns.2
         let forward = -simd_normalize(SIMD3<Float>(zAxis.x, zAxis.y, zAxis.z))
