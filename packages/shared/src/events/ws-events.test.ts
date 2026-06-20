@@ -138,7 +138,7 @@ describe('player.status', () => {
     const event = {
       type: 'player.status',
       player: { id: 1, level: 2, exp: 120 },
-      loadout: { equippedIds: [3], partySize: 1 },
+      loadout: { partySize: 1, mcpSlots: 0, partySlots: 1, modelTierMax: 0, enabledMcpRefs: [], selectedModelTier: 0 },
       equipment: [{ id: 3, kind: 'weapon', name: '黒曜のリンタ', abilityId: 'ability.tdd-skill' }],
     }
     expect(parseServerEvent(event)).toEqual(event)
@@ -148,7 +148,7 @@ describe('player.status', () => {
     const event = {
       type: 'player.status',
       player: { id: 1, level: 2, exp: 120 },
-      loadout: { equippedIds: [], partySize: 1 },
+      loadout: { partySize: 1, mcpSlots: 0, partySlots: 1, modelTierMax: 0, enabledMcpRefs: [], selectedModelTier: 0 },
     }
     expect(() => parseServerEvent(event)).toThrow()
   })
