@@ -22,3 +22,10 @@ export {
   type ToolUseDecision,
 } from './command-restriction.js'
 export { messageToBattleLogs, type BattleLogLine } from './forge-events.js'
+export {
+  createSpellChannel,
+  emergencyStop,
+  extractSessionId,
+  type SpellChannel,
+  type SpellMessage,
+} from './spell-channel.js'
