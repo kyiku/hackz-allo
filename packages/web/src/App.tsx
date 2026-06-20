@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { AssetGallery } from './assets/AssetGallery'
 import { BattleScreen } from './battle/BattleScreen'
 import { BlacksmithPanel } from './blacksmith/BlacksmithPanel'
 import { MapView } from './map/MapView'
@@ -80,6 +81,13 @@ export function App() {
           onForge={(issueNumber) => send({ type: 'cmd.forge', issueNumber })}
         />
       </section>
+
+      {import.meta.env.DEV && (
+        <section>
+          <h2 className="mb-2 text-lg font-semibold text-slate-200">アセット（開発確認用）</h2>
+          <AssetGallery />
+        </section>
+      )}
 
       <section>
         <h2 className="mb-2 text-lg font-semibold text-slate-200">
