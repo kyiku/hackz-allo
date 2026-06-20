@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { z } from 'zod/v4'
 import { createAgentStructuredGenerator, type StructuredQueryLike } from './agent-structured-generator'
 

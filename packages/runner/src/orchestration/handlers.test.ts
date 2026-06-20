@@ -15,8 +15,13 @@ function inMemoryLoadouts(initial: Loadout = { equippedIds: [], partySize: 1 }) 
   }
 }
 
-function makeContext(loadout?: Loadout): { ctx: JobContext; loadouts: ReturnType<typeof inMemoryLoadouts> } {
+function makeContext(loadout?: Loadout): {
+  ctx: JobContext
+  loadouts: ReturnType<typeof inMemoryLoadouts>
+  generate: ReturnType<typeof vi.fn>
+} {
   const loadouts = inMemoryLoadouts(loadout)
+  const generate = vi.fn()
   const ctx: JobContext = {
     backend: { emit: vi.fn(async () => {}) },
     players: {
@@ -30,9 +35,10 @@ function makeContext(loadout?: Loadout): { ctx: JobContext; loadouts: ReturnType
       createFromReward: vi.fn(),
       listByPlayer: vi.fn(() => []),
     },
+    generator: { generate },
     playerId: 1,
   }
-  return { ctx, loadouts }
+  return { ctx, loadouts, generate }
 }
 
 describe('createJobHandlers - loadout', () => {
@@ -72,6 +78,21 @@ describe('createJobHandlers - loadout', () => {
     const { ctx, loadouts } = makeContext({ equippedIds: [], partySize: 3 })
     await createJobHandlers(ctx).onLoadoutTune({ effort: 'high' })
     expect(loadouts.update).toHaveBeenCalledWith(1, { equippedIds: [], partySize: 3 })
+  })
+})
+
+describe('createJobHandlers - tavern', () => {
+  it('onTavern は会話から issue 案を生成し tavern.issueDraft を配信する', async () => {
+    const { ctx, generate } = makeContext()
+    const draft = { title: 'NPEを直す', body: 'null安全に', labels: ['bug'] }
+    generate.mockResolvedValue(draft)
+
+    await createJobHandlers(ctx).onTavern('ログインでたまに落ちる')
+
+    // 生成器のプロンプトに会話が含まれる
+    expect(generate.mock.calls[0][1].prompt).toContain('ログインでたまに落ちる')
+    // ドラフトが配信される
+    expect(ctx.backend.emit).toHaveBeenCalledWith({ type: 'tavern.issueDraft', draft })
   })
 })
 
