@@ -134,21 +134,27 @@ describe('parseClientEvent', () => {
 })
 
 describe('player.status', () => {
-  it('equipment コレクションを含めてパースする', () => {
+  it('player と loadout のみでパースする（equipment 廃止）', () => {
     const event = {
       type: 'player.status',
       player: { id: 1, level: 2, exp: 120 },
       loadout: { partySize: 1, mcpSlots: 0, partySlots: 1, modelTierMax: 0, enabledMcpRefs: [], selectedModelTier: 0 },
-      equipment: [{ id: 3, kind: 'weapon', name: '黒曜のリンタ', abilityId: 'ability.tdd-skill' }],
     }
     expect(parseServerEvent(event)).toEqual(event)
   })
 
-  it('equipment が欠けていれば拒否する', () => {
+  it('player が欠けていれば拒否する', () => {
+    const event = {
+      type: 'player.status',
+      loadout: { partySize: 1, mcpSlots: 0, partySlots: 1, modelTierMax: 0, enabledMcpRefs: [], selectedModelTier: 0 },
+    }
+    expect(() => parseServerEvent(event)).toThrow()
+  })
+
+  it('loadout が欠けていれば拒否する', () => {
     const event = {
       type: 'player.status',
       player: { id: 1, level: 2, exp: 120 },
-      loadout: { partySize: 1, mcpSlots: 0, partySlots: 1, modelTierMax: 0, enabledMcpRefs: [], selectedModelTier: 0 },
     }
     expect(() => parseServerEvent(event)).toThrow()
   })
