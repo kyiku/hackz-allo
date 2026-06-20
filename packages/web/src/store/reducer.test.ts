@@ -68,7 +68,16 @@ describe('applyServerEvent', () => {
       { type: 'battle.started', battleId: 'b1', enemyId: 10, hpTotal: 5 },
       { type: 'battle.log', battleId: 'b1', line: '攻撃が命中', kind: 'attack' },
     ])
-    expect(state.battles['b1']?.logs).toEqual([{ line: '攻撃が命中', kind: 'attack' }])
+    expect(state.battles['b1']?.logs).toEqual([{ seq: 0, line: '攻撃が命中', kind: 'attack' }])
+  })
+
+  it('battle.log は追記ごとに seq を採番する（描画 key 用）', () => {
+    const state = apply([
+      { type: 'battle.started', battleId: 'b1', enemyId: 10, hpTotal: 5 },
+      { type: 'battle.log', battleId: 'b1', line: '攻撃が命中', kind: 'attack' },
+      { type: 'battle.log', battleId: 'b1', line: 'HPを回復', kind: 'heal' },
+    ])
+    expect(state.battles['b1']?.logs.map((log) => log.seq)).toEqual([0, 1])
   })
 
   it('battle.defeated で戦闘を撃破にし対応する敵も撃破扱いにする', () => {

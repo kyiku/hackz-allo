@@ -13,6 +13,8 @@ import type {
 
 /** 戦闘ログ1行（演出の色分け用に kind を保持）。 */
 export interface BattleLogLine {
+  /** 追記順の安定キー（描画 key 用。ログは追記専用で並び替わらない）。 */
+  seq: number
   line: string
   kind: BattleLogKind
 }
@@ -112,7 +114,7 @@ export function applyServerEvent(state: GameData, event: ServerEvent): GameData 
           ...state.battles,
           [event.battleId]: {
             ...battle,
-            logs: [...battle.logs, { line: event.line, kind: event.kind }],
+            logs: [...battle.logs, { seq: battle.logs.length, line: event.line, kind: event.kind }],
           },
         },
       }

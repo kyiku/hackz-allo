@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { BattleScreen } from './battle/BattleScreen'
 import { BlacksmithPanel } from './blacksmith/BlacksmithPanel'
 import { MapView } from './map/MapView'
 import { useGameStore, type ConnectionStatus } from './store/gameStore'
@@ -102,16 +103,12 @@ export function App() {
 
       <section>
         <h2 className="mb-2 text-lg font-semibold text-slate-200">戦闘 {battleList.length}件</h2>
-        <ul className="flex flex-col gap-1">
+        <div className="flex flex-col gap-3">
           {battleList.map((battle) => (
-            <li key={battle.battleId} className="text-slate-300">
-              {battle.battleId}: HP {battle.hpCurrent}/{battle.hpTotal}・{battle.status}
-            </li>
+            <BattleScreen key={battle.battleId} battleId={battle.battleId} />
           ))}
-          {battleList.length === 0 && (
-            <li className="text-slate-500">進行中の戦闘はありません。</li>
-          )}
-        </ul>
+          {battleList.length === 0 && <p className="text-slate-500">進行中の戦闘はありません。</p>}
+        </div>
       </section>
     </main>
   )

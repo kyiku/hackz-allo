@@ -38,22 +38,24 @@ test('接続→敵出現→TDD戦闘→HP減少→撃破まで観測できる', 
   // WS接続が確立し「接続済み」になる。
   await expect(page.getByText('接続済み')).toBeVisible()
 
-  // ワールド状態が届き、敵(issue)がマップ/一覧に出現する。
+  // ワールド状態が届き、敵(issue)が一覧に出現する。
+  // 鍛冶屋の依頼セレクトにも同名の option が出るため、敵一覧の listitem に限定して検証する。
   const worldState: ServerEvent = { type: 'world.state', world, enemies: [enemy] }
   await ws.send(worldState)
-  await expect(page.getByText('#42 ログイン不具合', { exact: false })).toBeVisible()
+  await expect(page.getByRole('listitem').filter({ hasText: '#42 ログイン不具合' })).toBeVisible()
 
-  // 戦闘開始（HP=対象テスト件数）。
+  // 戦闘開始（HP=対象テスト件数）。戦闘画面(BattleScreen)が出現する。
   await ws.send({ type: 'battle.started', battleId: 'b1', enemyId: 10, hpTotal: 3 })
-  await expect(page.getByText(/b1: HP 3\/3・fighting/)).toBeVisible()
+  await expect(page.getByText('b1・戦闘中')).toBeVisible()
 
-  // 1pass=HP-1 のリアルタイム反映。
+  // 1pass=HP-1 のリアルタイム反映。BattleScreen の HP 表示 "2/3"・"1/3" を確認
+  // （敵一覧は "HP 3/3" のままなので、減少値は戦闘画面のみに現れ一意）。
   await ws.send({ type: 'battle.hp_changed', battleId: 'b1', hpCurrent: 2 })
-  await expect(page.getByText(/b1: HP 2\/3/)).toBeVisible()
+  await expect(page.getByText('2/3')).toBeVisible()
   await ws.send({ type: 'battle.hp_changed', battleId: 'b1', hpCurrent: 1 })
-  await expect(page.getByText(/b1: HP 1\/3/)).toBeVisible()
+  await expect(page.getByText('1/3')).toBeVisible()
 
-  // 全pass→撃破確定（報酬付き）。HP0・defeated に遷移する。
+  // 全pass→撃破確定（報酬付き）。撃破状態になり報酬が表示される。
   await ws.send({
     type: 'battle.defeated',
     battleId: 'b1',
@@ -65,5 +67,6 @@ test('接続→敵出現→TDD戦闘→HP減少→撃破まで観測できる', 
       abilityId: null,
     },
   })
-  await expect(page.getByText(/b1: HP 0\/3・defeated/)).toBeVisible()
+  await expect(page.getByText('b1・撃破')).toBeVisible()
+  await expect(page.getByText(/報酬獲得: 黒曜のリンタ/)).toBeVisible()
 })
