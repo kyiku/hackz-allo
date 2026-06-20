@@ -1,4 +1,4 @@
-import type { ConnectErrorReason, LoadoutTuning } from '@github-issue-rpg/shared'
+import type { ConnectErrorReason, Enemy, IssueDraft, LoadoutTuning } from '@github-issue-rpg/shared'
 import type { StructuredGenerator } from '../ai/structured-generator.js'
 import type { EquipmentRepository } from '../db/repositories/equipment-repository.js'
 import type { LoadoutRepository } from '../db/repositories/loadout-repository.js'
@@ -6,9 +6,11 @@ import type { PlayerRepository } from '../db/repositories/player-repository.js'
 import { buildPlayerStatusEvent } from '../loadout/projection.js'
 import { generateIssueProposal } from '../tavern/issue-proposal.js'
 import {
+  buildEnemyStats,
   generateRequiredTests,
   generateWorldState,
   GithubFetchError,
+  parseRepoUrl,
   type FetchedIssue,
 } from '../world/index.js'
 import type { BackendClient } from './backend-client.js'
@@ -46,6 +48,12 @@ export interface JobContext {
   generator: StructuredGenerator
   /** open issue を取得する（repo接続＝ワールド生成に使う。PATは内部に閉じる）。 */
   fetchIssues(owner: string, name: string): Promise<FetchedIssue[]>
+  /** issue を作成する（酒場での登録に使う）。作成された番号/URLを返す。 */
+  createIssue(
+    owner: string,
+    name: string,
+    draft: { title: string; body: string; labels: string[] },
+  ): Promise<{ number: number; url: string }>
   /** 現在接続中リポジトリの可変状態（onConnect が設定、onForge が参照）。 */
   session: { repoUrl: string | null }
   /** cmd.forge の実体（clone→Claude→テスト→PR）。実依存は外側で注入する。 */
@@ -92,7 +100,38 @@ export function createJobHandlers(ctx: JobContext): JobHandlers {
       await ctx.backend.emit({ type: 'tavern.issueDraft', draft })
     },
 
-    onTavernPublish: notWired('cmd.tavern.publish'),
+    async onTavernPublish(draft: IssueDraft): Promise<void> {
+      // 酒場の issue 案を実リポジトリへ登録し、新しい敵としてワールドへ出現させる（要件5.9, 5.2）。
+      const repoUrl = ctx.session.repoUrl
+      if (!repoUrl) {
+        throw new Error('リポジトリ未接続のため issue を登録できません。先にワールドへ接続してください。')
+      }
+      const { owner, name } = parseRepoUrl(repoUrl)
+      const created = await ctx.createIssue(owner, name, {
+        title: draft.title,
+        body: draft.body,
+        labels: draft.labels,
+      })
+      // 登録した issue を即座に敵として配信（再ポーリングを待たず反映する）。
+      const requiredTests = await generateRequiredTests(ctx.generator, {
+        title: draft.title,
+        body: draft.body,
+        labels: draft.labels,
+      }).catch(() => [] as string[])
+      const stats = buildEnemyStats({ requiredTests, labels: draft.labels })
+      const enemy: Enemy = {
+        id: created.number,
+        worldId: 1,
+        issueNumber: created.number,
+        title: draft.title,
+        hpTotal: stats.hpTotal,
+        hpCurrent: stats.hpTotal,
+        difficulty: stats.difficulty,
+        weakness: stats.weakness,
+        status: 'active',
+      }
+      await ctx.backend.emit({ type: 'enemy.appeared', enemy })
+    },
 
     async onLoadoutEquip(equipmentId: number, equipped: boolean): Promise<void> {
       const loadout = ctx.loadouts.getByPlayer(ctx.playerId)

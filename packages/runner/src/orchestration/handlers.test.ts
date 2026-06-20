@@ -38,6 +38,7 @@ function makeContext(loadout?: Loadout): {
     },
     generator: { generate },
     fetchIssues: vi.fn(async () => []),
+    createIssue: vi.fn(async () => ({ number: 7, url: 'https://github.com/o/r/issues/7' })),
     session: { repoUrl: null },
     forgeBattle: vi.fn(async () => {}),
     playerId: 1,
@@ -97,6 +98,38 @@ describe('createJobHandlers - tavern', () => {
     expect(generate.mock.calls[0][1].prompt).toContain('ログインでたまに落ちる')
     // ドラフトが配信される
     expect(ctx.backend.emit).toHaveBeenCalledWith({ type: 'tavern.issueDraft', draft })
+  })
+
+  it('onTavernPublish は issue を作成し enemy.appeared を配信する', async () => {
+    const { ctx, generate } = makeContext()
+    ctx.session.repoUrl = 'https://github.com/kyiku/hackz-allo-demo'
+    generate.mockResolvedValue({ tests: ['t1', 't2'] })
+
+    await createJobHandlers(ctx).onTavernPublish({
+      title: 'ログイン高速化',
+      body: '遅い',
+      labels: ['perf'],
+    })
+
+    expect(ctx.createIssue).toHaveBeenCalledWith('kyiku', 'hackz-allo-demo', {
+      title: 'ログイン高速化',
+      body: '遅い',
+      labels: ['perf'],
+    })
+    expect(ctx.backend.emit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'enemy.appeared',
+        enemy: expect.objectContaining({ issueNumber: 7, title: 'ログイン高速化', status: 'active' }),
+      }),
+    )
+  })
+
+  it('onTavernPublish はリポジトリ未接続なら例外（偽の成功にしない）', async () => {
+    const { ctx } = makeContext()
+    await expect(
+      createJobHandlers(ctx).onTavernPublish({ title: 't', body: 'b', labels: [] }),
+    ).rejects.toThrow(/未接続/)
+    expect(ctx.createIssue).not.toHaveBeenCalled()
   })
 })
 

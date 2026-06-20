@@ -14,6 +14,7 @@
 import { createAgentStructuredGeneratorWithSdk } from './ai/index.js'
 import { createNodeForgeBattle } from './battle/index.js'
 import { loadConfig, type RunnerConfig } from './config/index.js'
+import { createGitHubGateway, createOctokit } from './github/index.js'
 import { fetchOpenIssues } from './world/index.js'
 import {
   createDatabase,
@@ -50,6 +51,7 @@ function buildJobContext(config: RunnerConfig): JobContext {
 
   const backend = createHttpBackendClient(BACKEND_URL)
   const generator = createAgentStructuredGeneratorWithSdk()
+  const gateway = createGitHubGateway({ octokit: createOctokit(config.githubPat) })
   // 接続中リポジトリの可変状態（onConnect が設定し、forgeBattle が参照する）。
   const session: { repoUrl: string | null } = { repoUrl: null }
   const forgeBattle = createNodeForgeBattle({
@@ -68,6 +70,8 @@ function buildJobContext(config: RunnerConfig): JobContext {
     generator,
     // PAT は Runner 内に閉じ、owner/name を受けて open issue を取得する関数として渡す。
     fetchIssues: (owner, name) => fetchOpenIssues(config.githubPat, { owner, name }),
+    createIssue: (owner, name, draft) =>
+      gateway.createIssue({ owner, name, url: `https://github.com/${owner}/${name}` }, draft),
     session,
     forgeBattle,
     playerId: player.id,
