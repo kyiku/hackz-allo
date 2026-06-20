@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { registerClaimHandler, rewardCandidates, startRewardGame } from '../native/rewardBridge'
 import { BattleScreen } from '../battle/BattleScreen'
 import { BlacksmithPanel } from '../blacksmith/BlacksmithPanel'
 import { ConnectedRepoConnectPanel } from '../connect/RepoConnectPanel'
@@ -71,6 +72,25 @@ export function WorldScreen() {
     const timer = setTimeout(() => setPendingBattleIssue(null), 90000)
     return () => clearTimeout(timer)
   }, [pendingBattleIssue])
+
+  // ネイティブ（WKWebView）からの報酬確定を cmd.reward.claim へ橋渡しする。
+  const sendRef = useRef(send)
+  sendRef.current = send
+  useEffect(() => {
+    registerClaimHandler((abilityIds) => {
+      if (abilityIds.length > 0) sendRef.current({ type: 'cmd.reward.claim', abilityIds })
+    })
+  }, [])
+
+  // 敵を撃破したら（battle.defeated → status=defeated）、ネイティブのAR報酬ミニゲームを起動する。
+  const rewardedBattles = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    for (const battle of battleList) {
+      if (battle.status !== 'defeated' || rewardedBattles.current.has(battle.battleId)) continue
+      rewardedBattles.current.add(battle.battleId)
+      startRewardGame(rewardCandidates(battle.enemyId))
+    }
+  }, [battleList])
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-rpg-bg text-rpg-ink">
