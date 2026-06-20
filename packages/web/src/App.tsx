@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { MapView } from './map/MapView'
 import { useGameStore, type ConnectionStatus } from './store/gameStore'
 import { createGameSocket } from './ws/client'
 
@@ -24,15 +25,20 @@ export function App() {
   const world = useGameStore((s) => s.world)
   const enemies = useGameStore((s) => s.enemies)
   const battles = useGameStore((s) => s.battles)
+  const send = useGameStore((s) => s.send)
 
   useEffect(() => {
-    const { ingest, setConnection } = useGameStore.getState()
+    const { ingest, setConnection, setSender } = useGameStore.getState()
     const socket = createGameSocket({
       url: wsUrl(),
       onEvent: ingest,
       onStatus: setConnection,
     })
-    return () => socket.close()
+    setSender(socket.send)
+    return () => {
+      socket.close()
+      setSender(() => {})
+    }
   }, [])
 
   const enemyList = Object.values(enemies)
@@ -51,12 +57,16 @@ export function App() {
       <section>
         <h2 className="mb-2 text-lg font-semibold text-slate-200">ワールド</h2>
         {world ? (
-          <p className="text-slate-300">
+          <p className="mb-3 text-slate-300">
             {world.repoOwner}/{world.repoName}
           </p>
         ) : (
-          <p className="text-slate-500">未接続（リポジトリ接続UIはタスク10.8で実装する）。</p>
+          <p className="mb-3 text-slate-500">未接続（リポジトリ接続UIはタスク10.8で実装する）。</p>
         )}
+        <MapView
+          enemies={enemyList}
+          onEngage={(issueNumber) => send({ type: 'cmd.forge', issueNumber })}
+        />
       </section>
 
       <section>
