@@ -19,3 +19,7 @@ export {
   type LoadoutRepository,
   type LoadoutUpdate,
 } from './repositories/loadout-repository.js'
+export {
+  createEquipmentRepository,
+  type EquipmentRepository,
+} from './repositories/equipment-repository.js'
