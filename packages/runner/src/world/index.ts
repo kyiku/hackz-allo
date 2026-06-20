@@ -18,3 +18,4 @@ export {
   type Cell,
   type EnemyPlacement,
 } from './world-map.js'
+export { reconcileEnemies, type ExistingEnemy, type ReconcileResult } from './issue-reconciler.js'
