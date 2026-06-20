@@ -1,186 +1,141 @@
 import SwiftUI
-import Combine
 
-/// 報酬ミニゲームの1枚のカード（2Dで確実に表示する）。
-private struct RewardCard: Identifiable {
-    let id = UUID()
-    let abilityId: String
-    let name: String
-    var faceUp = false
-    var collected = false
-}
-
-/// 敵撃破の報酬ミニゲーム（台パン神経衰弱・2D表示）。
-/// カメラ越しの「台パン」（または画面タップ）で2枚めくり、同じ強化アイテムのペアを当てると獲得。
-/// AR物理に依存せずカードを必ず描画する。獲得能力IDを `onComplete` で返す。
+/// 敵撃破の報酬ミニゲーム（AR 台パン神経衰弱・報酬モード）。
+/// カード＝強化アイテム。平面に盤面を置き（または「目の前に置く」）、3回まで台パンして
+/// 当てたペアの能力を獲得する。クリア時に獲得能力IDを `onComplete` で返す。
 struct RewardGameView: View {
     let specs: [RewardCardSpec]
     let onComplete: ([String]) -> Void
 
-    /// カメラ表示と台パン検出のためだけに使う（盤面は置かない）。
     @StateObject private var engine: GameEngine
-    @State private var cards: [RewardCard]
-    @State private var swingsLeft: Int
-    @State private var busy = false
-    @State private var finished = false
-
-    private static let maxSwings = 3
 
     init(specs: [RewardCardSpec], onComplete: @escaping ([String]) -> Void) {
         self.specs = specs
         self.onComplete = onComplete
         _engine = StateObject(wrappedValue: GameEngine.reward(specs: specs))
-        var deck: [RewardCard] = []
-        for spec in specs {
-            deck.append(RewardCard(abilityId: spec.abilityId, name: spec.name))
-            deck.append(RewardCard(abilityId: spec.abilityId, name: spec.name))
-        }
-        _cards = State(initialValue: deck.shuffled())
-        _swingsLeft = State(initialValue: RewardGameView.maxSwings)
+    }
+
+    /// 能力ID → 表示名（結果表示用）。
+    private var nameById: [String: String] {
+        Dictionary(uniqueKeysWithValues: specs.map { ($0.abilityId, $0.name) })
     }
 
     var body: some View {
         ZStack {
-            ARViewContainer(controller: engine.scene).ignoresSafeArea()
-            Color.black.opacity(0.4).ignoresSafeArea()
-            if finished { resultView } else { playView }
+            Color.black.ignoresSafeArea()
+            switch engine.phase {
+            case .placing: placingView
+            case .playing: playingView
+            case .clear: resultView
+            }
+        }
+    }
+
+    // MARK: - 配置
+
+    private var placingView: some View {
+        ZStack(alignment: .bottom) {
+            ARViewContainer(controller: engine.scene, onTap: { point in
+                engine.placeBoard(atScreenPoint: point)
+            })
+            .ignoresSafeArea()
+            VStack { candidateBanner; Spacer() }
+            VStack(spacing: 12) {
+                Text(engine.isPlaneReady
+                    ? "⚡ 平面をタップして札を並べよう"
+                    : "テーブルにカメラを向けてください")
+                    .font(.subheadline)
+                    .padding(8)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                Button(action: { engine.placeBoardInFront() }) {
+                    Text("目の前に置く（平面が出ない時）")
+                        .font(.subheadline.bold())
+                        .padding(.horizontal, 16).padding(.vertical, 10)
+                        .background(.orange, in: Capsule())
+                        .foregroundStyle(.black)
+                }
+                #if targetEnvironment(simulator)
+                Button("（シミュレータ）中央に配置") { engine.placeBoardForSimulator() }
+                    .buttonStyle(.borderedProminent)
+                #endif
+            }
+            .padding(.bottom, 44)
             cancelButton
         }
-        .onReceive(engine.swings) { _ in performTurn() }
     }
 
-    // MARK: - プレイ
+    // MARK: - プレイ（3振り）
 
-    private var playView: some View {
-        VStack(spacing: 16) {
-            VStack(spacing: 4) {
-                Text("⚡ 報酬チャレンジ").font(.title2.bold()).foregroundStyle(.white)
-                Text("台パン（または画面タップ）で2枚めくる！　残り \(swingsLeft) 回")
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.yellow)
+    private var playingView: some View {
+        ZStack(alignment: .topLeading) {
+            ARViewContainer(controller: engine.scene)
+                .ignoresSafeArea()
+            HUDView(
+                game: engine.gameState,
+                isHandDetected: engine.isHandDetected,
+                maxPower: engine.config.maxPower
+            )
+            VStack(spacing: 8) {
+                swingsBadge
+                candidateBanner
+                Spacer()
             }
-            .padding(.top, 48)
-
-            cardGrid
-
-            Spacer()
-            Text("同じ強化アイテムのペアを当てると獲得！")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.8))
-                .padding(.bottom, 24)
-        }
-        .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .contentShape(Rectangle())
-        .onTapGesture { performTurn() }
-    }
-
-    private var cardGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
-        return LazyVGrid(columns: columns, spacing: 10) {
-            ForEach(cards) { card in cardTile(card) }
+            cancelButton
         }
     }
 
-    private func cardTile(_ card: RewardCard) -> some View {
-        let revealed = card.faceUp || card.collected
-        return ZStack {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(
-                    card.collected
-                        ? Color.green.opacity(0.35)
-                        : (revealed ? Color(red: 0.99, green: 0.97, blue: 0.86) : Color(red: 0.15, green: 0.2, blue: 0.55))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(card.collected ? Color.green : Color.white.opacity(0.4), lineWidth: 2)
-                )
-            if revealed {
-                VStack(spacing: 4) {
-                    Text("⚡").font(.title2)
-                    Text(card.name)
+    private var swingsBadge: some View {
+        let remaining = max(0, (engine.config.maxSwings ?? 0) - engine.gameState.turns)
+        return Text("残り \(remaining) 回 台パン！")
+            .font(.headline.bold())
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .background(.orange, in: Capsule())
+            .foregroundStyle(.black)
+            .padding(.top, 60)
+            .padding(.leading, 16)
+    }
+
+    /// AR描画に依存せず「今回の強化候補」を常時2Dで見せる（カード＝AI強化を明示）。
+    private var candidateBanner: some View {
+        VStack(spacing: 4) {
+            Text("⚡ 強化候補（ペアを当てて獲得）")
+                .font(.caption.bold())
+                .foregroundStyle(.white.opacity(0.9))
+            HStack(spacing: 6) {
+                ForEach(specs, id: \.abilityId) { spec in
+                    Text(spec.name)
                         .font(.caption2.bold())
-                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(.yellow.opacity(0.85), in: Capsule())
                         .foregroundStyle(.black)
-                        .lineLimit(3)
                 }
-                .padding(4)
-            } else {
-                Image(systemName: "questionmark.diamond.fill")
-                    .font(.largeTitle)
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            if card.collected {
-                VStack {
-                    HStack {
-                        Spacer()
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    }
-                    Spacer()
-                }
-                .padding(4)
             }
         }
-        .frame(height: 96)
-    }
-
-    // MARK: - 1ターン（2枚めくる）
-
-    private func performTurn() {
-        guard !busy, !finished, swingsLeft > 0 else { return }
-        let downIndices = cards.indices.filter { !cards[$0].faceUp && !cards[$0].collected }
-        guard downIndices.count >= 2 else { return }
-        let picks = Array(downIndices.shuffled().prefix(2))
-        busy = true
-        swingsLeft -= 1
-        for index in picks { cards[index].faceUp = true }
-
-        let isMatch = cards[picks[0]].abilityId == cards[picks[1]].abilityId
-        let delay = isMatch ? 0.6 : 1.0
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            if isMatch {
-                for index in picks { cards[index].collected = true }
-            } else {
-                for index in picks { cards[index].faceUp = false }
-            }
-            busy = false
-            if cards.allSatisfy({ $0.collected }) || swingsLeft <= 0 {
-                finished = true
-            }
-        }
+        .padding(8)
+        .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
     }
 
     // MARK: - 結果
 
-    private var acquiredIds: [String] {
-        var seen = Set<String>()
-        var out: [String] = []
-        for card in cards where card.collected {
-            if !seen.contains(card.abilityId) {
-                seen.insert(card.abilityId)
-                out.append(card.abilityId)
-            }
-        }
-        return out
-    }
-
     private var resultView: some View {
-        let names = cards.filter { $0.collected }.map { $0.name }
-        let unique = Array(Set(names)).sorted()
+        let acquired = engine.acquiredAbilityIds
         return VStack(spacing: 18) {
             Spacer()
             Text("⚡ 強化獲得！").font(.largeTitle.bold()).foregroundStyle(.white)
-            if unique.isEmpty {
+            if acquired.isEmpty {
                 Text("今回は当たらなかった…次は当てよう！").foregroundStyle(.white.opacity(0.85))
             } else {
                 VStack(spacing: 10) {
-                    ForEach(unique, id: \.self) { name in
-                        Text("・\(name)").font(.title3.bold()).foregroundStyle(.yellow)
+                    ForEach(acquired, id: \.self) { id in
+                        Text("・\(nameById[id] ?? id)").font(.title3.bold()).foregroundStyle(.yellow)
                     }
                 }
             }
             Spacer()
-            Button(action: { onComplete(acquiredIds) }) {
+            Button(action: { onComplete(acquired) }) {
                 Text("受け取って戻る")
                     .font(.title3.bold())
                     .frame(maxWidth: 280)
@@ -198,7 +153,7 @@ struct RewardGameView: View {
         VStack {
             HStack {
                 Spacer()
-                Button(action: { onComplete(acquiredIds) }) {
+                Button(action: { onComplete(engine.acquiredAbilityIds) }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title2)
                         .foregroundStyle(.white.opacity(0.85))

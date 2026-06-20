@@ -121,6 +121,19 @@ final class GameEngine: ObservableObject {
     }
     #endif
 
+    /// 平面検出に頼らず、カメラ前方（少し下）に盤面を置いてプレイ開始する。
+    /// 「目の前に置く」フォールバック。平面が出ない/見つけにくい場面でも確実に札を出す。
+    func placeBoardInFront(distance: Float = 0.5, drop: Float = 0.2) {
+        let camera = scene.arView.cameraTransform
+        let zAxis = camera.matrix.columns.2
+        let forward = -simd_normalize(SIMD3<Float>(zAxis.x, zAxis.y, zAxis.z))
+        let position = camera.translation + forward * distance + SIMD3<Float>(0, -drop, 0)
+        if let existing = boardAnchor { scene.arView.scene.removeAnchor(existing) }
+        let anchor = AnchorEntity(world: position)
+        scene.arView.scene.addAnchor(anchor)
+        installBoard(on: anchor)
+    }
+
     /// アンカーに盤面を組んでプレイ開始する共通処理。
     private func installBoard(on anchor: AnchorEntity) {
         if let existing = boardAnchor, existing !== anchor {
