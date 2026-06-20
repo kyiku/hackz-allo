@@ -36,6 +36,22 @@ describe('parseServerEvent', () => {
   it('クライアント方向のイベントはサーバーイベントとして拒否する', () => {
     expect(() => parseServerEvent({ type: 'cmd.forge', issueNumber: 1 })).toThrow()
   })
+
+  it('tavern.issueDraft をパースする', () => {
+    const event = {
+      type: 'tavern.issueDraft',
+      draft: { title: 'NPEを直す', body: 'null安全に', labels: ['bug'] },
+    }
+    expect(parseServerEvent(event)).toEqual(event)
+  })
+
+  it('tavern.issueDraft の title が空なら拒否する', () => {
+    const event = {
+      type: 'tavern.issueDraft',
+      draft: { title: '', body: '', labels: [] },
+    }
+    expect(() => parseServerEvent(event)).toThrow()
+  })
 })
 
 describe('parseClientEvent', () => {
@@ -51,5 +67,13 @@ describe('parseClientEvent', () => {
 
   it('issueNumberが数値でなければ拒否する', () => {
     expect(() => parseClientEvent({ type: 'cmd.forge', issueNumber: 'x' })).toThrow()
+  })
+
+  it('cmd.tavern.publish をパースする', () => {
+    const event = {
+      type: 'cmd.tavern.publish',
+      draft: { title: 'リファクタ', body: '整理する', labels: ['refactor'] },
+    }
+    expect(parseClientEvent(event)).toEqual(event)
   })
 })

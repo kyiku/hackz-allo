@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useGameStore, type ConnectionStatus } from './store/gameStore'
+import { ConnectedTavernPanel } from './tavern/TavernPanel'
 import { createGameSocket } from './ws/client'
 
 const CONNECTION_LABEL: Record<ConnectionStatus, string> = {
@@ -26,13 +27,17 @@ export function App() {
   const battles = useGameStore((s) => s.battles)
 
   useEffect(() => {
-    const { ingest, setConnection } = useGameStore.getState()
+    const { ingest, setConnection, setSender } = useGameStore.getState()
     const socket = createGameSocket({
       url: wsUrl(),
       onEvent: ingest,
       onStatus: setConnection,
     })
-    return () => socket.close()
+    setSender(socket.send)
+    return () => {
+      socket.close()
+      setSender(() => {})
+    }
   }, [])
 
   const enemyList = Object.values(enemies)
@@ -72,6 +77,11 @@ export function App() {
           ))}
           {enemyList.length === 0 && <li className="text-slate-500">敵はまだ出現していません。</li>}
         </ul>
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold text-slate-200">酒場</h2>
+        <ConnectedTavernPanel />
       </section>
 
       <section>

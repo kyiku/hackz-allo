@@ -7,6 +7,7 @@ function handlers() {
     onSpell: vi.fn(async () => {}),
     onStop: vi.fn(async () => {}),
     onTavern: vi.fn(async () => {}),
+    onTavernPublish: vi.fn(async () => {}),
     onConnect: vi.fn(async () => {}),
   }
 }
@@ -20,7 +21,11 @@ describe('createJobDispatcher', () => {
 
   it('spell.cast を onSpell に振り分ける', async () => {
     const h = handlers()
-    await createJobDispatcher(h).dispatch({ type: 'spell.cast', battleId: 'b1', message: 'null確認' })
+    await createJobDispatcher(h).dispatch({
+      type: 'spell.cast',
+      battleId: 'b1',
+      message: 'null確認',
+    })
     expect(h.onSpell).toHaveBeenCalledWith('b1', 'null確認')
   })
 
@@ -33,6 +38,13 @@ describe('createJobDispatcher', () => {
     expect(h.onStop).toHaveBeenCalledWith('b1')
     expect(h.onTavern).toHaveBeenCalledWith('バグ直したい')
     expect(h.onConnect).toHaveBeenCalledWith('https://github.com/k/r')
+  })
+
+  it('cmd.tavern.publish を onTavernPublish に振り分ける', async () => {
+    const h = handlers()
+    const draft = { title: 'NPEを直す', body: 'null安全に', labels: ['bug'] }
+    await createJobDispatcher(h).dispatch({ type: 'cmd.tavern.publish', draft })
+    expect(h.onTavernPublish).toHaveBeenCalledWith(draft)
   })
 
   it('未知のイベントは例外', async () => {
