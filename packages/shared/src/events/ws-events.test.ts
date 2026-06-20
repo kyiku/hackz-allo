@@ -76,4 +76,50 @@ describe('parseClientEvent', () => {
     }
     expect(parseClientEvent(event)).toEqual(event)
   })
+
+  it('cmd.loadout.equip をパースする', () => {
+    const event = { type: 'cmd.loadout.equip', equipmentId: 3, equipped: true }
+    expect(parseClientEvent(event)).toEqual(event)
+  })
+
+  it('cmd.loadout.tune をパースする', () => {
+    const event = { type: 'cmd.loadout.tune', tuning: { effort: 'high', partySize: 2 } }
+    expect(parseClientEvent(event)).toEqual(event)
+  })
+
+  it('cmd.loadout.tune の未知キーを拒否する（strict）', () => {
+    const event = { type: 'cmd.loadout.tune', tuning: { bogus: 1 } }
+    expect(() => parseClientEvent(event)).toThrow()
+  })
+
+  it('cmd.loadout.tune の partySize 上限超過を拒否する', () => {
+    const event = { type: 'cmd.loadout.tune', tuning: { partySize: 6 } }
+    expect(() => parseClientEvent(event)).toThrow()
+  })
+
+  it('cmd.loadout.tune の未知 permissionMode を拒否する', () => {
+    const event = { type: 'cmd.loadout.tune', tuning: { permissionMode: 'bogus' } }
+    expect(() => parseClientEvent(event)).toThrow()
+  })
+})
+
+describe('player.status', () => {
+  it('equipment コレクションを含めてパースする', () => {
+    const event = {
+      type: 'player.status',
+      player: { id: 1, level: 2, exp: 120 },
+      loadout: { equippedIds: [3], partySize: 1 },
+      equipment: [{ id: 3, kind: 'weapon', name: '黒曜のリンタ', abilityId: 'ability.tdd-skill' }],
+    }
+    expect(parseServerEvent(event)).toEqual(event)
+  })
+
+  it('equipment が欠けていれば拒否する', () => {
+    const event = {
+      type: 'player.status',
+      player: { id: 1, level: 2, exp: 120 },
+      loadout: { equippedIds: [], partySize: 1 },
+    }
+    expect(() => parseServerEvent(event)).toThrow()
+  })
 })

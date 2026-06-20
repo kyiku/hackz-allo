@@ -110,6 +110,9 @@ describe('applyServerEvent', () => {
         type: 'player.status',
         player: { id: 1, level: 2, exp: 120 },
         loadout: { equippedIds: [1], partySize: 1 },
+        equipment: [
+          { id: 1, kind: 'weapon', name: '黒曜のリンタ', abilityId: 'ability.tdd-skill' },
+        ],
       },
       {
         type: 'world.assignments',
@@ -118,6 +121,7 @@ describe('applyServerEvent', () => {
     ])
     expect(state.player).toMatchObject({ level: 2, exp: 120 })
     expect(state.loadout?.equippedIds).toEqual([1])
+    expect(state.equipment).toHaveLength(1)
     expect(state.assignments).toHaveLength(1)
   })
 

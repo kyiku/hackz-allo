@@ -3,6 +3,7 @@ import { AssetGallery } from './assets/AssetGallery'
 import { BattleScreen } from './battle/BattleScreen'
 import { BlacksmithPanel } from './blacksmith/BlacksmithPanel'
 import { MapView } from './map/MapView'
+import { ConnectedStatusScreen } from './status/StatusScreen'
 import { useGameStore, type ConnectionStatus } from './store/gameStore'
 import { ConnectedTavernPanel } from './tavern/TavernPanel'
 import { createGameSocket } from './ws/client'
@@ -107,6 +108,11 @@ export function App() {
       <section>
         <h2 className="mb-2 text-lg font-semibold text-slate-200">酒場</h2>
         <ConnectedTavernPanel />
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold text-slate-200">ステータス / 編成</h2>
+        <ConnectedStatusScreen />
       </section>
 
       <section>

@@ -8,6 +8,8 @@ function handlers() {
     onStop: vi.fn(async () => {}),
     onTavern: vi.fn(async () => {}),
     onTavernPublish: vi.fn(async () => {}),
+    onLoadoutEquip: vi.fn(async () => {}),
+    onLoadoutTune: vi.fn(async () => {}),
     onConnect: vi.fn(async () => {}),
   }
 }
@@ -45,6 +47,15 @@ describe('createJobDispatcher', () => {
     const draft = { title: 'NPEを直す', body: 'null安全に', labels: ['bug'] }
     await createJobDispatcher(h).dispatch({ type: 'cmd.tavern.publish', draft })
     expect(h.onTavernPublish).toHaveBeenCalledWith(draft)
+  })
+
+  it('cmd.loadout.equip / cmd.loadout.tune を振り分ける', async () => {
+    const h = handlers()
+    const d = createJobDispatcher(h)
+    await d.dispatch({ type: 'cmd.loadout.equip', equipmentId: 3, equipped: true })
+    await d.dispatch({ type: 'cmd.loadout.tune', tuning: { effort: 'high', partySize: 2 } })
+    expect(h.onLoadoutEquip).toHaveBeenCalledWith(3, true)
+    expect(h.onLoadoutTune).toHaveBeenCalledWith({ effort: 'high', partySize: 2 })
   })
 
   it('未知のイベントは例外', async () => {

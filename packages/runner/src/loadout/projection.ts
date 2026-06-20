@@ -1,4 +1,4 @@
-import type { Assignment, Loadout, Player, ServerEvent } from '@github-issue-rpg/shared'
+import type { Assignment, Equipment, Loadout, Player, ServerEvent } from '@github-issue-rpg/shared'
 
 /**
  * 編成/チューニングの状態投影（要件5.10）。
@@ -6,9 +6,13 @@ import type { Assignment, Loadout, Player, ServerEvent } from '@github-issue-rpg
  * 装備中能力を次戦の query() に注入するための buildAgentOptions を提供する。
  */
 
-/** プレイヤー状態/編成の配信イベントを生成する。 */
-export function buildPlayerStatusEvent(player: Player, loadout: Loadout): ServerEvent {
-  return { type: 'player.status', player, loadout }
+/** プレイヤー状態/編成/装備コレクションの配信イベントを生成する。 */
+export function buildPlayerStatusEvent(
+  player: Player,
+  loadout: Loadout,
+  equipment: Equipment[] = [],
+): ServerEvent {
+  return { type: 'player.status', player, loadout, equipment }
 }
 
 /** issueアサイン状況の配信イベントを生成する。 */
