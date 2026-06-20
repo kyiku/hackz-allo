@@ -115,11 +115,23 @@ struct WebAppRootView: View {
         .navigationViewStyle(.stack)
     }
 
-    /// 動作確認用のサンプル報酬（カタログのIDに対応）。
+    /// 動作確認用のサンプル報酬（カタログ全15種＝神経衰弱30枚）。
     static let sampleRewardSpecs: [RewardCardSpec] = [
         RewardCardSpec(abilityId: "ability.tdd-skill", name: "TDDの心得"),
         RewardCardSpec(abilityId: "ability.github-mcp", name: "github連携の籠手"),
         RewardCardSpec(abilityId: "ability.refactor-plugin", name: "整地の杖"),
+        RewardCardSpec(abilityId: "ability.security-skill", name: "防壁の心得"),
+        RewardCardSpec(abilityId: "ability.perf-skill", name: "俊足の心得"),
+        RewardCardSpec(abilityId: "ability.context7-mcp", name: "叡智の書物"),
+        RewardCardSpec(abilityId: "ability.debug-skill", name: "千里眼"),
+        RewardCardSpec(abilityId: "ability.types-skill", name: "型の鎧"),
+        RewardCardSpec(abilityId: "ability.coverage-skill", name: "網羅の眼"),
+        RewardCardSpec(abilityId: "ability.docs-skill", name: "賢者の筆"),
+        RewardCardSpec(abilityId: "ability.lint-plugin", name: "静寂の篩"),
+        RewardCardSpec(abilityId: "ability.git-skill", name: "時渡りの腕輪"),
+        RewardCardSpec(abilityId: "ability.sqlite-mcp", name: "記録の水晶"),
+        RewardCardSpec(abilityId: "ability.playwright-mcp", name: "操り人形の糸"),
+        RewardCardSpec(abilityId: "ability.arch-skill", name: "設計者の羅針盤"),
     ]
 
     private func openSettings() {

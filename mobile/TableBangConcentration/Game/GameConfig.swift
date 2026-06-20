@@ -58,10 +58,12 @@ struct GameConfig {
 extension GameConfig {
     /// 実機チューニング前のたたき台。
     static let `default` = GameConfig(
-        swingVelocityThreshold: 0.8,
-        velocityForMaxPower: 3.0,
-        punchCooldown: 0.4,
-        maxSampleGap: 0.2,
+        // 手検出チューニング: しきい値を下げて振り下ろしを拾いやすく、
+        // 検出が一瞬途切れても着地として成立させる（maxSampleGapを広げる）。
+        swingVelocityThreshold: 0.55,
+        velocityForMaxPower: 2.4,
+        punchCooldown: 0.45,
+        maxSampleGap: 0.35,
         nominalHandDepth: 0.5,
         depthToMetersFactor: 1.2,
         minPower: 0.0,
