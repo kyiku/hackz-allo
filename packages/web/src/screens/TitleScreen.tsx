@@ -30,11 +30,13 @@ export function TitleScreen({ onStart }: TitleScreenProps) {
         }}
       />
       <div className="relative text-center">
-        <p className="mb-3 font-pixel text-sm tracking-[0.4em] text-rpg-gold">⚔ PRESS START ⚔</p>
-        <h1 className="font-pixel text-5xl leading-tight tracking-wide text-rpg-ink drop-shadow-[0_4px_0_rgba(0,0,0,0.6)] sm:text-6xl">
+        <p className="mb-3 font-pixel text-xs tracking-[0.3em] text-rpg-gold sm:text-sm sm:tracking-[0.4em]">
+          ⚔ PRESS START ⚔
+        </p>
+        <h1 className="font-pixel text-4xl leading-tight tracking-wide text-rpg-ink drop-shadow-[0_4px_0_rgba(0,0,0,0.6)] sm:text-5xl md:text-6xl">
           <span className="text-rpg-gold">GitHub</span> Issue RPG
         </h1>
-        <p className="mt-5 text-base text-rpg-muted">issue を敵に、TDD を戦闘に。</p>
+        <p className="mt-5 text-sm text-rpg-muted sm:text-base">issue を敵に、TDD を戦闘に。</p>
       </div>
       <button
         type="button"

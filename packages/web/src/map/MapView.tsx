@@ -1,7 +1,7 @@
 import type { Enemy } from '@github-issue-rpg/shared'
 import Phaser from 'phaser'
-import { useEffect, useRef } from 'react'
-import { GRID } from './grid'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { GRID, type Direction } from './grid'
 import { MapScene, type InteractHandler } from './MapScene'
 
 interface MapViewProps {
@@ -12,17 +12,36 @@ interface MapViewProps {
   paused?: boolean
 }
 
+/** 画面パッド等から呼ぶマップ操作API（WorldScreen が ref 経由で利用）。 */
+export interface MapControls {
+  move(dir: Direction): void
+  interact(): void
+}
+
 /**
  * Phaserマップを React にマウントするラッパー（タスク#117）。
  * 親要素いっぱいにフルスクリーン表示（Scale.FIT＋pixelArtでピクセルパーフェクト）。
  * Phaser.Game の生成は一度だけ。敵集合の更新はシーンへ流し込み再描画する。
  * onInteract は ref 経由で最新を参照し、ゲーム再生成を避ける。
+ * 画面パッド用に move/interact を ref で公開する（タッチ操作対応）。
  */
-export function MapView({ enemies, onInteract, paused = false }: MapViewProps) {
+export const MapView = forwardRef<MapControls, MapViewProps>(function MapView(
+  { enemies, onInteract, paused = false },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<MapScene | null>(null)
   const onInteractRef = useRef(onInteract)
   onInteractRef.current = onInteract
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      move: (dir) => sceneRef.current?.move(dir),
+      interact: () => sceneRef.current?.interact(),
+    }),
+    [],
+  )
 
   useEffect(() => {
     const parent = containerRef.current
@@ -60,4 +79,4 @@ export function MapView({ enemies, onInteract, paused = false }: MapViewProps) {
   }, [paused])
 
   return <div ref={containerRef} className="h-full w-full" />
-}
+})
