@@ -3,15 +3,17 @@ import { enemyName } from './enemyName'
 
 interface NpcEncounterProps {
   enemyId: number
-  /** 「戦う」選択時（cmd.forge 後にモーダルを閉じる）。 */
+  /** 会話を閉じる（「とじる」）。 */
   onClose: () => void
+  /** 「戦う」選択時。issue番号を渡し、戦闘開始（cmd.forge）と準備中表示は親が担う。 */
+  onFight: (issueNumber: number) => void
 }
 
 /**
  * 敵（issue）NPCとの遭遇イベント（タスク#117）。
  * マップで敵に話しかけたときに開く。攻略情報（NPC会話）を聞き、「戦う」で鍛冶屋依頼（戦闘開始）する。
  */
-export function NpcEncounter({ enemyId, onClose }: NpcEncounterProps) {
+export function NpcEncounter({ enemyId, onClose, onFight }: NpcEncounterProps) {
   const enemy = useGameStore((s) => s.enemies[enemyId])
   const dialogue = useGameStore((s) => s.npcDialogues[enemyId])
   const send = useGameStore((s) => s.send)
@@ -58,10 +60,7 @@ export function NpcEncounter({ enemyId, onClose }: NpcEncounterProps) {
         </button>
         <button
           type="button"
-          onClick={() => {
-            send({ type: 'cmd.forge', issueNumber: enemy.issueNumber })
-            onClose()
-          }}
+          onClick={() => onFight(enemy.issueNumber)}
           className="rpg-btn rpg-btn-amber"
         >
           戦う
