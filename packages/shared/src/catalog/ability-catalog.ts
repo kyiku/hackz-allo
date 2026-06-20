@@ -134,3 +134,13 @@ const CATALOG_BY_ID = new Map(ABILITY_CATALOG.map((ability) => [ability.id, abil
 export function getAbility(id: string): Ability | undefined {
   return CATALOG_BY_ID.get(id)
 }
+
+/** MCP割り当てプール（神経衰弱で枠だけ得て、ここから自由割り当てする）。 */
+export function mcpPool(): Ability[] {
+  return ABILITY_CATALOG.filter((a) => a.kind === 'mcp').map((a) => ({ ...a }))
+}
+
+/** MCPプールの ref 配列。 */
+export function mcpRefs(): string[] {
+  return mcpPool().map((a) => a.ref)
+}

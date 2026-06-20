@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ABILITY_CATALOG, abilitySchema, getAbility } from './ability-catalog'
+import { ABILITY_CATALOG, abilitySchema, getAbility, mcpPool, mcpRefs } from './ability-catalog'
 
 describe('ABILITY_CATALOG', () => {
   it('MVPの3能力を持つ', () => {
@@ -31,5 +31,13 @@ describe('getAbility', () => {
 
   it('未知のidは undefined', () => {
     expect(getAbility('ability.unknown')).toBeUndefined()
+  })
+})
+
+describe('mcpPool', () => {
+  it('mcp種別のみ返す', () => {
+    expect(mcpPool().every((a) => a.kind === 'mcp')).toBe(true)
+    expect(mcpRefs()).toContain('github')
+    expect(mcpRefs()).toContain('context7')
   })
 })
