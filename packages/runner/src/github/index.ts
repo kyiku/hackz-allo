@@ -4,6 +4,7 @@ export { createGitClient, type GitClient, type SimpleGitLike } from './git-clien
 export { createGit } from './git-factory.js'
 export { aggregateCheckRuns, waitForCI, type CIStatus, type CIState } from './ci-status.js'
 export { enableAutoMergeWithFallback, type AutoMergeResult } from './auto-merge.js'
+export type { CreatedIssue, EnableAutoMergeParams } from './github-gateway.js'
 export type {
   GitHubIssue,
   RepoConnection,
