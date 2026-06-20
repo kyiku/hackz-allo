@@ -33,9 +33,12 @@ final class GameEngine: ObservableObject {
     var acquiredAbilityIds: [String] { cardManager.collectedAbilityIds }
 
     /// 報酬モードの GameEngine を作る（3回振り下ろし上限＋報酬カード）。
+    /// 札数が少ないので、視認性のためカードを大きめ＆間隔広めにする。
     static func reward(specs: [RewardCardSpec], maxSwings: Int = 3) -> GameEngine {
         var config = GameConfig.default
         config.maxSwings = maxSwings
+        config.cardSize = SIMD3<Float>(0.10, 0.004, 0.14)
+        config.cardSpacing = 0.16
         return GameEngine(config: config, rewardSpecs: specs)
     }
 

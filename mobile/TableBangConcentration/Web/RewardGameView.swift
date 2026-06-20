@@ -52,6 +52,7 @@ struct RewardGameView: View {
                 #endif
             }
             .padding(.bottom, 44)
+            VStack { candidateBanner; Spacer() }
             cancelButton
         }
     }
@@ -67,9 +68,36 @@ struct RewardGameView: View {
                 isHandDetected: engine.isHandDetected,
                 maxPower: engine.config.maxPower
             )
-            swingsBadge
+            VStack(spacing: 8) {
+                swingsBadge
+                candidateBanner
+                Spacer()
+            }
             cancelButton
         }
+    }
+
+    /// AR描画に依存せず「今回の強化候補」を常時2Dで見せるバナー（カード＝AI強化を明示）。
+    private var candidateBanner: some View {
+        VStack(spacing: 4) {
+            Text("⚡ 強化候補（ペアを当てて獲得）")
+                .font(.caption.bold())
+                .foregroundStyle(.white.opacity(0.9))
+            HStack(spacing: 6) {
+                ForEach(specs, id: \.abilityId) { spec in
+                    Text(spec.name)
+                        .font(.caption2.bold())
+                        .lineLimit(1)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(.yellow.opacity(0.85), in: Capsule())
+                        .foregroundStyle(.black)
+                }
+            }
+        }
+        .padding(8)
+        .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.leading, 16)
+        .padding(.trailing, 16)
     }
 
     private var swingsBadge: some View {
