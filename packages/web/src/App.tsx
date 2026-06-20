@@ -4,10 +4,10 @@ import { TitleScreen } from './screens/TitleScreen'
 import { WorldScreen } from './screens/WorldScreen'
 import { useGameStore } from './store/gameStore'
 import { createGameSocket } from './ws/client'
+import { resolveWsUrl } from './ws/endpoint'
 
 function wsUrl(): string {
-  const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
-  return `${protocol}://${location.host}/ws`
+  return resolveWsUrl(location, localStorage)
 }
 
 /**

@@ -48,7 +48,7 @@ export function NpcEncounter({ enemyId, onClose }: NpcEncounterProps) {
         </p>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => send({ type: 'cmd.npc.talk', enemyId })}
@@ -65,6 +65,9 @@ export function NpcEncounter({ enemyId, onClose }: NpcEncounterProps) {
           className="rpg-btn rpg-btn-amber"
         >
           戦う
+        </button>
+        <button type="button" onClick={onClose} className="rpg-btn rpg-btn-ghost ml-auto">
+          とじる
         </button>
       </div>
     </div>
