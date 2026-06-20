@@ -11,3 +11,10 @@ export {
   getOrCreateNpcDialogue,
   type NpcDialogueContent,
 } from './npc-dialogue.js'
+export {
+  seededCell,
+  placeEnemies,
+  type GridConfig,
+  type Cell,
+  type EnemyPlacement,
+} from './world-map.js'
