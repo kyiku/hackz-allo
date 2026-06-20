@@ -1,8 +1,10 @@
 import type { LoadoutTuning } from '@github-issue-rpg/shared'
+import type { StructuredGenerator } from '../ai/structured-generator.js'
 import type { EquipmentRepository } from '../db/repositories/equipment-repository.js'
 import type { LoadoutRepository } from '../db/repositories/loadout-repository.js'
 import type { PlayerRepository } from '../db/repositories/player-repository.js'
 import { buildPlayerStatusEvent } from '../loadout/projection.js'
+import { generateIssueProposal } from '../tavern/issue-proposal.js'
 import type { BackendClient } from './backend-client.js'
 import type { JobHandlers } from './dispatcher.js'
 
@@ -24,6 +26,8 @@ export interface JobContext {
   players: PlayerRepository
   loadouts: LoadoutRepository
   equipment: EquipmentRepository
+  /** 構造化生成器（既定は Agent SDK = サブスク認証。酒場の issue 案生成等に使う）。 */
+  generator: StructuredGenerator
   /** 単一プレイヤー前提のデモにおける対象プレイヤーID。 */
   playerId: number
 }
@@ -32,7 +36,7 @@ export interface JobContext {
  * Runner のジョブハンドラ集合を組み立てる。
  *
  * Backend↔Runner の輸送（job-server / dispatcher）はこの集合に依存して動く。
- * 実体に結線済み: 編成（装備付け替え / チューニング）。
+ * 実体に結線済み: 編成（装備付け替え / チューニング）、酒場の issue 案生成。
  * 未結線のハンドラは {@link JobNotImplementedError} を投げ、偽の成功を返さない
  * （GitHub連携・ForgeAgent・テスト監視は順次ここへ結線していく）。
  */
@@ -59,7 +63,13 @@ export function createJobHandlers(ctx: JobContext): JobHandlers {
     onForge: notWired('cmd.forge'),
     onSpell: notWired('spell.cast'),
     onStop: notWired('cmd.stop'),
-    onTavern: notWired('cmd.tavern'),
+
+    async onTavern(message: string): Promise<void> {
+      // 会話から issue 案を生成し、ワンクリック登録用のドラフトとして配信する（要件5.9）。
+      const draft = await generateIssueProposal(ctx.generator, { conversation: message })
+      await ctx.backend.emit({ type: 'tavern.issueDraft', draft })
+    },
+
     onTavernPublish: notWired('cmd.tavern.publish'),
 
     async onLoadoutEquip(equipmentId: number, equipped: boolean): Promise<void> {

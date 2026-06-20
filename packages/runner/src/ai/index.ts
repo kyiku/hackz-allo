@@ -10,6 +10,7 @@ export {
   type StructuredQueryLike,
   type AgentStructuredGeneratorDeps,
 } from './agent-structured-generator.js'
+export { createAgentStructuredGeneratorWithSdk } from './agent-generator-factory.js'
 export {
   buildForgeOptions,
   runForge,
