@@ -6,6 +6,11 @@ export {
 } from './structured-generator.js'
 export { createAnthropic, createAnthropicStructuredGenerator } from './anthropic-factory.js'
 export {
+  createAgentStructuredGenerator,
+  type StructuredQueryLike,
+  type AgentStructuredGeneratorDeps,
+} from './agent-structured-generator.js'
+export {
   buildForgeOptions,
   runForge,
   type ForgeOptions,

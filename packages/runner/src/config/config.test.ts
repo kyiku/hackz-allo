@@ -18,11 +18,18 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ANTHROPIC_API_KEY: 'sk-ant-xxx' })).toThrow(/GITHUB_PAT/)
   })
 
-  it('ANTHROPIC_API_KEY が無ければ変数名を含むエラーを投げる', () => {
-    expect(() => loadConfig({ GITHUB_PAT: 'ghp_xxx' })).toThrow(/ANTHROPIC_API_KEY/)
+  it('ANTHROPIC_API_KEY は任意（未設定なら undefined で通る・サブスク認証用）', () => {
+    expect(loadConfig({ GITHUB_PAT: 'ghp_xxx' })).toEqual({
+      githubPat: 'ghp_xxx',
+      anthropicApiKey: undefined,
+    })
   })
 
-  it('空文字の秘密情報を拒否する', () => {
+  it('ANTHROPIC_API_KEY が空文字なら誤設定として拒否する', () => {
+    expect(() => loadConfig({ ...validEnv, ANTHROPIC_API_KEY: '' })).toThrow(/ANTHROPIC_API_KEY/)
+  })
+
+  it('空文字の GITHUB_PAT を拒否する', () => {
     expect(() => loadConfig({ ...validEnv, GITHUB_PAT: '' })).toThrow(/GITHUB_PAT/)
   })
 
