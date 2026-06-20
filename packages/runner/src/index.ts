@@ -16,7 +16,13 @@ import { createAgentStructuredGeneratorWithSdk } from './ai/index.js'
 import { createNodeForgeBattle } from './battle/index.js'
 import { loadConfig, type RunnerConfig } from './config/index.js'
 import { createGitHubGateway, createOctokit } from './github/index.js'
-import { fetchOpenIssues, parseRepoUrl, removedIssueNumbers } from './world/index.js'
+import {
+  fetchOpenIssues,
+  generateRequiredTests,
+  generateWorldState,
+  parseRepoUrl,
+} from './world/index.js'
+import type { StructuredGenerator } from './ai/index.js'
 import type { BackendClient } from './orchestration/backend-client.js'
 import {
   createDatabase,
@@ -59,7 +65,7 @@ function buildJobContext(config: RunnerConfig): JobContext {
     repoUrl: null,
     enemyIssueNumbers: new Set(),
   }
-  startWorldPoller({ session, backend, githubPat: config.githubPat })
+  startWorldPoller({ session, backend, githubPat: config.githubPat, generator })
   const forgeBattle = createNodeForgeBattle({
     githubPat: config.githubPat,
     generator,
@@ -98,14 +104,24 @@ function buildJobContext(config: RunnerConfig): JobContext {
 /** ワールド更新間隔(ms)。一定間隔で open issue を取得し、閉じた敵を撤去する（要件5.2）。 */
 const WORLD_POLL_INTERVAL = 20000
 
+/** 2つの数値集合が同一か。 */
+function sameNumberSet(a: ReadonlySet<number>, b: ReadonlySet<number>): boolean {
+  if (a.size !== b.size) return false
+  for (const n of a) if (!b.has(n)) return false
+  return true
+}
+
 /**
- * 接続中リポジトリの open issue を定期取得し、クローズされた issue の敵を enemy.removed で撤去する。
- * LLMは呼ばず番号集合の差分だけを見るので軽量。新規追加は onConnect / 酒場が担う。
+ * 接続中リポジトリの open issue を定期取得し、集合が変化したら world.state を丸ごと再配信する。
+ * クライアントは world.state で敵を総入れ替えするため、クローズ済みの敵は確実に消え、
+ * 新規 issue も反映される（再起動や取りこぼし後も次の周期で自己修復, 要件5.2）。
+ * 集合が不変の周期では何もしない（LLM/通信を無駄に呼ばない）。
  */
 function startWorldPoller(deps: {
   session: { repoUrl: string | null; enemyIssueNumbers: Set<number> }
   backend: BackendClient
   githubPat: string
+  generator: StructuredGenerator
 }): void {
   setInterval(() => {
     const repoUrl = deps.session.repoUrl
@@ -115,9 +131,17 @@ function startWorldPoller(deps: {
         const { owner, name } = parseRepoUrl(repoUrl)
         const issues = await fetchOpenIssues(deps.githubPat, { owner, name })
         const current = new Set(issues.map((issue) => issue.number))
-        for (const removed of removedIssueNumbers(deps.session.enemyIssueNumbers, current)) {
-          await deps.backend.emit({ type: 'enemy.removed', enemyId: removed })
-        }
+        if (sameNumberSet(current, deps.session.enemyIssueNumbers)) return
+        // 変化あり → 権威的な world.state を再生成して再配信（全クライアントが同期）。
+        const event = await generateWorldState(
+          {
+            fetchIssues: async () => issues, // 取得済みを再利用（二重フェッチ回避）
+            generateTests: (issue) => generateRequiredTests(deps.generator, issue),
+            now: () => new Date().toISOString(),
+          },
+          repoUrl,
+        )
+        await deps.backend.emit(event)
         deps.session.enemyIssueNumbers = current
       } catch {
         // 一時的な取得失敗は無視（次の周期で再試行）。
