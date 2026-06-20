@@ -1,4 +1,5 @@
 import type { RepoRef } from '@github-issue-rpg/shared'
+import { aggregateCheckRuns, type CIStatus } from './ci-status.js'
 import type { IssueListItem, OctokitLike } from './octokit-like.js'
 import type { CreatePullRequestParams, GitHubIssue, PullRequest, RepoConnection } from './types.js'
 
@@ -10,6 +11,7 @@ export interface GitHubGateway {
   listIssues(repo: RepoRef): Promise<GitHubIssue[]>
   connectRepository(repo: RepoRef): Promise<RepoConnection>
   createPullRequest(params: CreatePullRequestParams): Promise<PullRequest>
+  getCIStatus(repo: RepoRef, ref: string): Promise<CIStatus>
 }
 
 /** 本文に対象issueの closing keyword を保証する（マージ時にissue自動close）。 */
@@ -105,6 +107,16 @@ export function createGitHubGateway({ octokit }: GitHubGatewayDeps): GitHubGatew
         body: withClosingKeyword(params.body, params.issueNumber),
       })
       return { number: data.number, url: data.html_url, nodeId: data.node_id }
+    },
+
+    async getCIStatus(repo, ref) {
+      const { data } = await octokit.rest.checks.listForRef({
+        owner: repo.owner,
+        repo: repo.name,
+        ref,
+        per_page: 100,
+      })
+      return aggregateCheckRuns(data.check_runs)
     },
   }
 }

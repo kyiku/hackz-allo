@@ -54,5 +54,13 @@ export interface OctokitLike {
         body?: string
       }): Promise<PullCreateResult>
     }
+    checks: {
+      listForRef(params: {
+        owner: string
+        repo: string
+        ref: string
+        per_page?: number
+      }): Promise<{ data: { total_count: number; check_runs: Array<{ status: string; conclusion: string | null }> } }>
+    }
   }
 }
