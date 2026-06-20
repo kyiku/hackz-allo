@@ -8,6 +8,7 @@ struct RewardGameView: View {
     let onComplete: ([String]) -> Void
 
     @StateObject private var engine: GameEngine
+    @State private var endingScheduled = false
 
     init(specs: [RewardCardSpec], onComplete: @escaping ([String]) -> Void) {
         self.specs = specs
@@ -27,6 +28,21 @@ struct RewardGameView: View {
             case .placing: placingView
             case .playing: playingView
             case .clear: resultView
+            }
+        }
+        .onAppear {
+            // 入った瞬間にカメラ正面へ盤面を自動配置（向いている方向に確実に出す）。
+            // ARのカメラ姿勢が安定するのを少し待ってから置く。
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                if engine.phase == .placing { engine.placeBoardInFront() }
+            }
+        }
+        // 台パン上限に達したら、最後の衝撃波・ペア成立を反映する余白(3秒)を置いて結果へ。
+        .onReceive(engine.gameState.$turns) { turns in
+            guard let max = engine.config.maxSwings, turns >= max, !endingScheduled else { return }
+            endingScheduled = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                engine.gameState.finishGame()
             }
         }
     }
@@ -86,10 +102,10 @@ struct RewardGameView: View {
 
     private var swingsBadge: some View {
         let remaining = max(0, (engine.config.maxSwings ?? 0) - engine.gameState.turns)
-        return Text("残り \(remaining) 回 台パン！")
+        return Text(remaining > 0 ? "残り \(remaining) 回 台パン！" : "判定中…")
             .font(.headline.bold())
             .padding(.horizontal, 14).padding(.vertical, 8)
-            .background(.orange, in: Capsule())
+            .background(remaining > 0 ? Color.orange : Color.gray, in: Capsule())
             .foregroundStyle(.black)
             .padding(.top, 60)
             .padding(.leading, 16)

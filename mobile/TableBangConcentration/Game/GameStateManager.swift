@@ -39,13 +39,17 @@ final class GameStateManager: ObservableObject {
     }
 
     /// 1ターン（台パン1回）を加算する。プレイ中のみ。
-    /// 報酬モード（config.maxSwings 設定時）は上限到達でクリアへ移行する。
+    /// 上限到達での終了は呼び出し側がバッファを置いて `finishGame()` で行う
+    /// （最後の台パンの衝撃波・ペア成立を反映してから結果へ移すため）。
     func incrementTurn() {
         guard phase == .playing else { return }
         turns += 1
-        if let maxSwings = config.maxSwings, turns >= maxSwings {
-            phase = .clear
-        }
+    }
+
+    /// 外部から結果（クリア）へ移行する。報酬モードで台パン上限到達後に使う。
+    func finishGame() {
+        guard phase == .playing else { return }
+        phase = .clear
     }
 
     /// 盤面静止で成立したペア数を反映する。複数同時成立はコンボ倍率を上げる（R6-3, R6-4）。
