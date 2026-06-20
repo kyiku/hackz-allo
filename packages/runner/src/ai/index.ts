@@ -13,3 +13,11 @@ export {
   type RunForgeParams,
 } from './forge-agent.js'
 export { runForgeWithSdk } from './forge-factory.js'
+export {
+  evaluateToolUse,
+  isDestructiveCommand,
+  isPathWithin,
+  buildCanUseTool,
+  type CanUseTool,
+  type ToolUseDecision,
+} from './command-restriction.js'
