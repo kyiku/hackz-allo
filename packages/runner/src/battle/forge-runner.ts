@@ -94,7 +94,12 @@ export async function runForgeBattle(
       branch: workspace.branch,
       issue,
     })
-    await deps.emit({ type: 'battle.log', battleId, line: `📜 PR作成: ${prUrl}`, kind: 'system' })
+    await deps.emit({
+      type: 'battle.log',
+      battleId,
+      line: `🏆 PRをマージしissueをクローズ: ${prUrl}`,
+      kind: 'system',
+    })
     await deps.emit({
       type: 'battle.defeated',
       battleId,

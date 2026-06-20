@@ -116,6 +116,26 @@ export function createNodeForgeBattle(
           issueNumber: issue.number,
           body: 'GitHub Issue RPG の runner がTDDで自動実装しました。',
         })
+        // ローカルテスト合格をゲートに、PRを squash マージする。
+        // 本文の `Fixes #n` により、マージで対象issueが自動クローズ＝敵が撃破される。
+        // 作成直後は mergeable 状態が未計算のことがあるため数回リトライする。
+        let merged = false
+        for (let attempt = 0; attempt < 6 && !merged; attempt += 1) {
+          try {
+            await octokit.rest.pulls.merge({
+              owner: repo.owner,
+              repo: repo.name,
+              pull_number: pr.number,
+              merge_method: 'squash',
+            })
+            merged = true
+          } catch {
+            await new Promise((resolve) => setTimeout(resolve, 2000))
+          }
+        }
+        if (!merged) {
+          throw new Error(`PR #${pr.number} のマージに失敗しました（mergeable 状態を確認してください）`)
+        }
         return pr.url
       },
 
