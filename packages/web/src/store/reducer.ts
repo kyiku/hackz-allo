@@ -3,6 +3,7 @@ import type {
   BattleLogKind,
   BattleStatus,
   Enemy,
+  IssueDraft,
   Loadout,
   Player,
   Reward,
@@ -39,6 +40,8 @@ export interface GameData {
   player: Player | null
   loadout: Loadout | null
   assignments: Assignment[]
+  /** 酒場で生成中の issue 案（未生成は null）。 */
+  tavernDraft: IssueDraft | null
 }
 
 export const initialGameData: GameData = {
@@ -48,6 +51,7 @@ export const initialGameData: GameData = {
   player: null,
   loadout: null,
   assignments: [],
+  tavernDraft: null,
 }
 
 /**
@@ -149,6 +153,9 @@ export function applyServerEvent(state: GameData, event: ServerEvent): GameData 
         },
       }
     }
+
+    case 'tavern.issueDraft':
+      return { ...state, tavernDraft: event.draft }
 
     case 'player.status':
       return { ...state, player: event.player, loadout: event.loadout }

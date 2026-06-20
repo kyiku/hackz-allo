@@ -1,8 +1,8 @@
-import type { ClientEvent } from '@github-issue-rpg/shared'
+import type { ClientEvent, IssueDraft } from '@github-issue-rpg/shared'
 
 /**
  * Runnerジョブのオーケストレーション（要件5.4, 5.5, 5.9, 5.1）。
- * クライアントイベント（cmd.forge/spell/stop/tavern/connect）を対応ハンドラへディスパッチする。
+ * クライアントイベント（cmd.forge/spell/stop/tavern/tavern.publish/connect）を対応ハンドラへディスパッチする。
  * issueポーリングはRunner実体側、Backendはスケジュールとresult反映のみ。
  */
 
@@ -11,6 +11,7 @@ export interface JobHandlers {
   onSpell(battleId: string, message: string): Promise<void>
   onStop(battleId: string): Promise<void>
   onTavern(message: string): Promise<void>
+  onTavernPublish(draft: IssueDraft): Promise<void>
   onConnect(repoUrl: string): Promise<void>
 }
 
@@ -31,6 +32,8 @@ export function createJobDispatcher(handlers: JobHandlers): JobDispatcher {
           return handlers.onStop(event.battleId)
         case 'cmd.tavern':
           return handlers.onTavern(event.message)
+        case 'cmd.tavern.publish':
+          return handlers.onTavernPublish(event.draft)
         case 'cmd.connect':
           return handlers.onConnect(event.repoUrl)
         default: {

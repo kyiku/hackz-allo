@@ -112,6 +112,12 @@ describe('applyServerEvent', () => {
     expect(state.assignments).toHaveLength(1)
   })
 
+  it('tavern.issueDraft で issue 案を保持する', () => {
+    const draft = { title: 'NPEを直す', body: 'null安全に', labels: ['bug'] }
+    const state = apply([{ type: 'tavern.issueDraft', draft }])
+    expect(state.tavernDraft).toEqual(draft)
+  })
+
   it('元の状態を破壊しない（イミュータブル）', () => {
     const before = apply([{ type: 'enemy.appeared', enemy }])
     apply([{ type: 'enemy.removed', enemyId: 10 }], before)
