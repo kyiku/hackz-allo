@@ -39,10 +39,10 @@ export function TavernPanel({ draft, onTalk, onPublish }: TavernPanelProps) {
   }
 
   return (
-    <article className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-800/60 p-4">
+    <article className="rpg-window flex flex-col gap-3 p-4">
       <header className="flex items-center gap-2">
         <span className="text-xl">🍺</span>
-        <h3 className="text-base font-semibold text-slate-200">酒場</h3>
+        <h3 className="text-base text-rpg-gold">酒場</h3>
       </header>
 
       <form onSubmit={talk} className="flex gap-2">
@@ -50,40 +50,33 @@ export function TavernPanel({ draft, onTalk, onPublish }: TavernPanelProps) {
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           placeholder="どんな課題を解決したい？（例: ログイン処理が遅い）"
-          className="flex-1 rounded border border-slate-600 bg-slate-900 px-3 py-1.5 text-sm text-slate-100"
+          className="rpg-input flex-1"
         />
-        <button
-          type="submit"
-          className="rounded bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white"
-        >
+        <button type="submit" className="rpg-btn rpg-btn-amber">
           相談する
         </button>
       </form>
 
       {draft && (
-        <div className="flex flex-col gap-2 rounded border border-slate-600 bg-slate-900/60 p-3">
-          <p className="text-sm font-semibold text-slate-100">{draft.title}</p>
+        <div className="rpg-panel flex flex-col gap-2 p-3">
+          <p className="text-sm font-semibold text-rpg-ink">{draft.title}</p>
           {draft.labels.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {draft.labels.map((label) => (
                 <span
                   key={label}
-                  className="rounded bg-slate-700 px-2 py-0.5 text-xs text-slate-200"
+                  className="rounded border border-rpg-frame/50 bg-rpg-window px-2 py-0.5 text-xs text-rpg-ink"
                 >
                   {label}
                 </span>
               ))}
             </div>
           )}
-          <p className="whitespace-pre-wrap text-sm text-slate-300">{draft.body}</p>
+          <p className="whitespace-pre-wrap text-sm text-rpg-muted">{draft.body}</p>
           {published ? (
             <p className="text-sm text-emerald-400">登録しました。ワールドに敵として出現します。</p>
           ) : (
-            <button
-              type="button"
-              onClick={publish}
-              className="self-start rounded bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white"
-            >
+            <button type="button" onClick={publish} className="rpg-btn rpg-btn-primary self-start">
               このissueを登録する
             </button>
           )}

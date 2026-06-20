@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "slice-assets": "tsx scripts/slice-assets.ts",
+    "build-interiors": "tsx scripts/build-interiors.ts"
   },
   "dependencies": {
     "@github-issue-rpg/shared": "workspace:*",
@@ -28,9 +30,12 @@
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "@types/pngjs": "^6.0.5",
     "jsdom": "^25.0.1",
+    "pngjs": "^7.0.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
     "vitest": "^2.1.8"

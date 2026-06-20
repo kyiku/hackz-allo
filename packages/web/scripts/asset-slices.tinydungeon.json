@@ -1,0 +1,17 @@
+{
+  "_README": "Kenney Tiny Dungeon(CC0, 16pxタイル, 192x176)からキャラ・敵を切り出す。pnpm --filter @github-issue-rpg/web slice-assets scripts/asset-slices.tinydungeon.json",
+  "source": "./sources/kenney-tinydungeon.png",
+  "out": "assets/sprites",
+  "tile": 16,
+  "slices": [
+    { "key": "ground", "x": 16, "y": 64, "w": 16, "h": 16 },
+    { "key": "player", "x": 0, "y": 128, "w": 16, "h": 16 },
+    { "key": "sage", "x": 0, "y": 112, "w": 16, "h": 16 },
+    { "key": "blacksmith", "x": 48, "y": 112, "w": 16, "h": 16 },
+    { "key": "tavern", "x": 48, "y": 128, "w": 16, "h": 16 },
+    { "key": "enemy-easy", "x": 0, "y": 144, "w": 16, "h": 16 },
+    { "key": "enemy-normal", "x": 32, "y": 144, "w": 16, "h": 16 },
+    { "key": "enemy-hard", "x": 16, "y": 160, "w": 16, "h": 16 },
+    { "key": "enemy-boss", "x": 32, "y": 160, "w": 16, "h": 16 }
+  ]
+}

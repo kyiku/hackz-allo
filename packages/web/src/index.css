@@ -1,3 +1,84 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    @apply bg-rpg-bg font-sans text-rpg-ink;
+  }
+  /* 見出し・ラベル類はピクセル系フォントで世界観を出す。 */
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-pixel;
+  }
+  /* ドット絵をにじませない（スプライト/タイル画像）。 */
+  img {
+    image-rendering: pixelated;
+  }
+  /* 入力中の選択・キャレットも世界観に寄せる。 */
+  ::selection {
+    @apply bg-rpg-gold/40;
+  }
+}
+
+@layer components {
+  /* RPGの「ウィンドウ」枠。紺地＋二重縁＋落ち影。 */
+  .rpg-window {
+    @apply rounded-md border-2 border-rpg-frame-dark bg-rpg-window text-rpg-ink shadow-window;
+  }
+
+  /* 枠内のサブパネル（一段沈んだ面）。 */
+  .rpg-panel {
+    @apply rounded border-2 border-rpg-frame-dark bg-rpg-window-dark/80 shadow-inset-deep;
+  }
+
+  /* ピクセル調ボタン（面取り凸→押下で沈む）。色は変種クラスで指定。 */
+  .rpg-btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded border-2 border-rpg-frame-dark px-4 py-2 font-pixel text-sm text-white shadow-btn transition-[transform,filter] duration-75;
+  }
+  .rpg-btn:hover:not(:disabled) {
+    @apply brightness-110;
+  }
+  .rpg-btn:active:not(:disabled) {
+    @apply translate-y-0.5 shadow-btn-pressed brightness-95;
+  }
+  .rpg-btn:disabled {
+    @apply cursor-not-allowed opacity-40;
+  }
+
+  .rpg-btn-gold {
+    @apply bg-rpg-gold text-[#3a2a08];
+  }
+  .rpg-btn-primary {
+    @apply bg-emerald-600;
+  }
+  .rpg-btn-amber {
+    @apply bg-amber-600;
+  }
+  .rpg-btn-violet {
+    @apply bg-violet-600;
+  }
+  .rpg-btn-danger {
+    @apply bg-rose-600;
+  }
+  /* 控えめな枠線ボタン（サブアクション）。 */
+  .rpg-btn-ghost {
+    @apply border-2 border-rpg-frame bg-rpg-window-dark/70 text-rpg-ink shadow-none hover:bg-rpg-window;
+  }
+
+  /* テキスト/セレクト入力（沈んだ面＋金フォーカス）。 */
+  .rpg-input {
+    @apply rounded border-2 border-rpg-frame-dark bg-rpg-window-dark px-3 py-2 text-sm text-rpg-ink shadow-inset-deep placeholder:text-rpg-muted/70;
+  }
+  .rpg-input:focus {
+    @apply outline-none ring-2 ring-rpg-gold/70;
+  }
+
+  /* 小さな見出しラベル（セクションタイトル）。 */
+  .rpg-label {
+    @apply font-pixel text-rpg-gold;
+  }
+}

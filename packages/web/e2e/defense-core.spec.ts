@@ -35,21 +35,21 @@ test('接続→敵出現→TDD戦闘→HP減少→撃破まで観測できる', 
   const ws = await mockGameSocket(page)
   await page.goto('/')
 
-  // WS接続が確立し「接続済み」になる。
+  // タイトル → リポジトリ選択へ。
+  await page.getByRole('button', { name: 'はじめる' }).click()
+
+  // WS接続が確立し「接続済み」になる（リポジトリ選択画面）。
   await expect(page.getByText('接続済み')).toBeVisible()
 
-  // ワールド状態が届き、敵(issue)が一覧に出現する。
-  // 鍛冶屋の依頼セレクトにも同名の option が出るため、敵一覧の listitem に限定して検証する。
+  // ワールド状態が届くとワールド画面へ遷移（敵はPhaserマップcanvas描画のためDOM検証はしない）。
   const worldState: ServerEvent = { type: 'world.state', world, enemies: [enemy] }
   await ws.send(worldState)
-  await expect(page.getByRole('listitem').filter({ hasText: '#42 ログイン不具合' })).toBeVisible()
 
-  // 戦闘開始（HP=対象テスト件数）。戦闘画面(BattleScreen)が出現する。
+  // 戦闘開始（HP=対象テスト件数）。戦闘画面(BattleScreen)がサイドパネルに出現する。
   await ws.send({ type: 'battle.started', battleId: 'b1', enemyId: 10, hpTotal: 3 })
   await expect(page.getByText('b1・戦闘中')).toBeVisible()
 
-  // 1pass=HP-1 のリアルタイム反映。BattleScreen の HP 表示 "2/3"・"1/3" を確認
-  // （敵一覧は "HP 3/3" のままなので、減少値は戦闘画面のみに現れ一意）。
+  // 1pass=HP-1 のリアルタイム反映。BattleScreen の HP 表示 "2/3"・"1/3" を確認。
   await ws.send({ type: 'battle.hp_changed', battleId: 'b1', hpCurrent: 2 })
   await expect(page.getByText('2/3')).toBeVisible()
   await ws.send({ type: 'battle.hp_changed', battleId: 'b1', hpCurrent: 1 })

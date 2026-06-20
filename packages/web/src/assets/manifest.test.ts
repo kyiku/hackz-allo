@@ -16,12 +16,12 @@ describe('enemyAssetKey', () => {
 
 describe('assetUrl', () => {
   it('既定ベースでURLを解決する', () => {
-    expect(assetUrl('player')).toBe('/assets/sprites/player.svg')
+    expect(assetUrl('player')).toBe('/assets/sprites/player.png')
   })
 
   it('ベースパスを正規化して結合する（末尾スラッシュ有無を吸収）', () => {
-    expect(assetUrl('town-bg', '/game')).toBe('/game/assets/bg/town.svg')
-    expect(assetUrl('town-bg', '/game/')).toBe('/game/assets/bg/town.svg')
+    expect(assetUrl('town-bg', '/game')).toBe('/game/assets/sprites/town-bg.png')
+    expect(assetUrl('town-bg', '/game/')).toBe('/game/assets/sprites/town-bg.png')
   })
 
   it('型外のキー（JS経由）はサイレントに undefined を返さず例外を投げる', () => {

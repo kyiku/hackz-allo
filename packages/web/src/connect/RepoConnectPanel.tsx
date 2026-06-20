@@ -39,14 +39,14 @@ export function RepoConnectPanel({ connected, connectError, onConnect }: RepoCon
   }
 
   return (
-    <article className="flex flex-col gap-2 rounded-lg border border-slate-700 bg-slate-800/60 p-4">
+    <article className="rpg-window flex flex-col gap-3 p-4">
       {connected && !switching && (
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm text-emerald-400">接続済み。ワールドを読み込みました。</p>
           <button
             type="button"
             onClick={() => setSwitching(true)}
-            className="rounded border border-slate-600 px-3 py-1 text-xs font-semibold text-slate-200"
+            className="rpg-btn rpg-btn-ghost px-3 py-1 text-xs"
           >
             別リポジトリに切替
           </button>
@@ -65,13 +65,9 @@ export function RepoConnectPanel({ connected, connectError, onConnect }: RepoCon
             placeholder="https://github.com/owner/repo"
             aria-invalid={url.length > 0 && !valid}
             aria-describedby={connectError ? 'connect-error' : undefined}
-            className="flex-1 rounded border border-slate-600 bg-slate-900 px-3 py-1.5 text-sm text-slate-100"
+            className="rpg-input flex-1"
           />
-          <button
-            type="submit"
-            disabled={!valid}
-            className="rounded bg-sky-600 px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
-          >
+          <button type="submit" disabled={!valid} className="rpg-btn rpg-btn-gold">
             接続
           </button>
         </form>
@@ -83,7 +79,7 @@ export function RepoConnectPanel({ connected, connectError, onConnect }: RepoCon
         </p>
       )}
       {connectError && (
-        <p id="connect-error" className="rounded bg-rose-500/20 px-3 py-2 text-sm text-rose-200">
+        <p id="connect-error" className="rpg-panel px-3 py-2 text-sm text-rose-300">
           {REASON_LABEL[connectError.reason]}：{connectError.message}
         </p>
       )}

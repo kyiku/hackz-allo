@@ -60,37 +60,35 @@ export function StatusScreen({
   }
 
   return (
-    <article className="flex flex-col gap-4 rounded-lg border border-slate-700 bg-slate-800/60 p-4">
+    <article className="rpg-window flex flex-col gap-4 p-4">
       <section>
-        <h3 className="mb-1 text-base font-semibold text-slate-200">ステータス</h3>
+        <h3 className="rpg-label mb-1 text-base">ステータス</h3>
         {player ? (
-          <p className="text-sm text-slate-300">
+          <p className="text-sm text-rpg-ink">
             Lv {player.level}・EXP {player.exp}・パーティ {loadout?.partySize ?? 1}体
           </p>
         ) : (
-          <p className="text-sm text-slate-500">プレイヤー情報は未取得です。</p>
+          <p className="text-sm text-rpg-muted">プレイヤー情報は未取得です。</p>
         )}
       </section>
 
       <section>
-        <h3 className="mb-1 text-base font-semibold text-slate-200">
-          装備（武器コレクション {equipment.length}）
-        </h3>
+        <h3 className="rpg-label mb-1 text-base">装備（武器コレクション {equipment.length}）</h3>
         {equipment.length === 0 ? (
-          <p className="text-sm text-slate-500">まだ装備はありません。敵を撃破して入手します。</p>
+          <p className="text-sm text-rpg-muted">まだ装備はありません。敵を撃破して入手します。</p>
         ) : (
-          <ul className="flex flex-col gap-1">
+          <ul className="flex flex-col gap-1.5">
             {equipment.map((item) => {
               const equipped = isEquipped(item.id, loadout)
               const ability = abilityLabel(item)
               return (
                 <li
                   key={item.id}
-                  className="flex items-center justify-between gap-2 rounded bg-slate-900/60 px-3 py-1.5"
+                  className="rpg-panel flex items-center justify-between gap-2 px-3 py-1.5"
                 >
-                  <span className="text-sm text-slate-200">
+                  <span className="text-sm text-rpg-ink">
                     {item.name}
-                    <span className="ml-1 text-xs text-slate-400">[{item.kind}]</span>
+                    <span className="ml-1 text-xs text-rpg-muted">[{item.kind}]</span>
                     {ability && (
                       <span className="ml-1 text-xs text-emerald-400">能力: {ability}</span>
                     )}
@@ -98,9 +96,7 @@ export function StatusScreen({
                   <button
                     type="button"
                     onClick={() => onEquip(item.id, !equipped)}
-                    className={`rounded px-3 py-1 text-xs font-semibold text-white ${
-                      equipped ? 'bg-slate-600' : 'bg-emerald-600'
-                    }`}
+                    className={`rpg-btn px-3 py-1 text-xs ${equipped ? 'rpg-btn-ghost' : 'rpg-btn-primary'}`}
                   >
                     {equipped ? '外す' : '装備'}
                   </button>
@@ -112,15 +108,15 @@ export function StatusScreen({
       </section>
 
       <section>
-        <h3 className="mb-1 text-base font-semibold text-slate-200">AIチューニング</h3>
+        <h3 className="rpg-label mb-1 text-base">AIチューニング</h3>
         <div className="flex flex-wrap items-end gap-3">
-          <label htmlFor="tune-effort" className="flex flex-col gap-1 text-xs text-slate-300">
-            努力度(effort)
+          <label htmlFor="tune-effort" className="flex flex-col gap-1 text-xs text-rpg-ink">
+            <span className="rpg-label">努力度(effort)</span>
             <select
               id="tune-effort"
               value={effort}
               onChange={(event) => selectEffort(event.target.value)}
-              className="rounded border border-slate-600 bg-slate-900 px-2 py-1 text-sm text-slate-100"
+              className="rpg-input py-1"
             >
               {EFFORTS.map((value) => (
                 <option key={value} value={value}>
@@ -129,8 +125,8 @@ export function StatusScreen({
               ))}
             </select>
           </label>
-          <label htmlFor="tune-party" className="flex flex-col gap-1 text-xs text-slate-300">
-            パーティ規模
+          <label htmlFor="tune-party" className="flex flex-col gap-1 text-xs text-rpg-ink">
+            <span className="rpg-label">パーティ規模</span>
             <input
               id="tune-party"
               type="number"
@@ -138,29 +134,23 @@ export function StatusScreen({
               max={MAX_PARTY_SIZE}
               value={partySize}
               onChange={(event) => setPartySize(clampPartySize(Number(event.target.value)))}
-              className="w-20 rounded border border-slate-600 bg-slate-900 px-2 py-1 text-sm text-slate-100"
+              className="rpg-input w-20 py-1"
             />
           </label>
-          <button
-            type="button"
-            onClick={applyTuning}
-            className="rounded bg-violet-600 px-4 py-1.5 text-sm font-semibold text-white"
-          >
+          <button type="button" onClick={applyTuning} className="rpg-btn rpg-btn-violet">
             反映する
           </button>
         </div>
       </section>
 
       <section>
-        <h3 className="mb-1 text-base font-semibold text-slate-200">
-          アサインissue（{assignments.length}）
-        </h3>
+        <h3 className="rpg-label mb-1 text-base">アサインissue（{assignments.length}）</h3>
         {assignments.length === 0 ? (
-          <p className="text-sm text-slate-500">アサイン中のissueはありません。</p>
+          <p className="text-sm text-rpg-muted">アサイン中のissueはありません。</p>
         ) : (
           <ul className="flex flex-col gap-1">
             {assignments.map((assignment) => (
-              <li key={assignment.issueNumber} className="text-sm text-slate-300">
+              <li key={assignment.issueNumber} className="text-sm text-rpg-ink">
                 #{assignment.issueNumber}・{assignment.status}
                 {assignment.battleId ? `（戦闘中: ${assignment.battleId}）` : '（未着手）'}
               </li>

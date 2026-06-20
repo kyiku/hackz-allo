@@ -1,19 +1,40 @@
 import type { Enemy } from '@github-issue-rpg/shared'
 import Phaser from 'phaser'
+import { assetUrl, enemyAssetKey, type AssetKey } from '../assets/manifest'
 import {
+  blockedCells,
+  cellKey,
   enemyAtCell,
   GRID,
-  LANDMARKS,
+  HOUSES,
+  HOUSE_TILES,
+  landmarkAtCell,
+  MAP_OBJECTS,
+  neighborCell,
+  PATH,
   placeEnemies,
   PLAYER_START,
   RESERVED_CELLS,
   step,
+  terrainAt,
+  WATER,
   type Cell,
   type Direction,
+  type House,
+  type LandmarkKind,
 } from './grid'
+import { BRIDGE, GRASS, GRASS_DETAILS, GRASS_PLAIN, pickAutoTile, TILE_SRC } from './tileset'
 
-/** 敵に接触したときに呼ぶハンドラ（issue番号で鍛冶屋依頼＝戦闘へ）。 */
-export type EngageHandler = (issueNumber: number) => void
+/**
+ * 決定キーでインタラクトした対象。Appがこれを見て対応するモーダル/イベントを開く。
+ * 敵→NPC会話＋戦闘、blacksmith→鍛冶屋、tavern→酒場、sage→ステータス/編成。
+ */
+export type InteractTarget =
+  | { kind: 'enemy'; enemyId: number; issueNumber: number }
+  | { kind: LandmarkKind }
+
+/** インタラクト発火ハンドラ。 */
+export type InteractHandler = (target: InteractTarget) => void
 
 const KEY_TO_DIR: Record<string, Direction> = {
   ArrowUp: 'up',
@@ -26,30 +47,55 @@ const KEY_TO_DIR: Record<string, Direction> = {
   d: 'right',
 }
 
-const DIFFICULTY_COLOR: Record<Enemy['difficulty'], number> = {
-  easy: 0x34d399,
-  normal: 0x60a5fa,
-  hard: 0xf59e0b,
-  boss: 0xf43f5e,
-}
+const INTERACT_KEYS = new Set([' ', 'Enter'])
 
 /**
- * RPG風マップのPhaserシーン。
- * 背景グリッド＋ランドマーク（鍛冶屋/酒場）＋敵スプライト＋プレイヤーを描画し、
- * 矢印/WASDキーでグリッド移動、敵セルへの進入で `engage` を呼ぶ。
- * 描画ロジックの判定部は grid.ts の純関数に委譲している。
+ * カメラズーム倍率。フィールド全体を画面に収めるため等倍(1)とする。
+ * FIT スケール（MapView）がワールド全体をアスペクト比を保って画面にフィットさせる。
+ */
+const CAMERA_ZOOM = 1
+
+/** preload で読み込むキャラ/敵テクスチャ（Tiny Dungeonの個別PNG）。背景は 'tiles' シート。 */
+const SPRITE_KEYS: AssetKey[] = ['player', 'enemy-easy', 'enemy-normal', 'enemy-hard', 'enemy-boss']
+
+/** 背景タイルシート（Kenney RPG Pack, 64px）のテクスチャキー。 */
+const TILES_KEY: AssetKey = 'tiles'
+
+/**
+ * RPG風マップのPhaserシーン（タスク#117）。
+ * 草地ベースに川/橋・土の道・木立・木造の家・小物をタイルで描画し、矢印/WASDで歩行移動。
+ * 静的な背景（地形/オブジェクト/家）は一度だけ描き、敵/プレイヤーだけ毎手番で再描画する。
+ * 水/木/建物のマスには踏み込めず、隣接して決定キー（Space/Enter）でインタラクトする。判定は grid.ts に委譲。
  */
 export class MapScene extends Phaser.Scene {
-  private readonly engage: EngageHandler
+  private readonly onInteract: InteractHandler
+  private readonly base: string
   private enemies: Enemy[] = []
   private placements = new Map<number, Cell>()
   private player: Cell = { ...PLAYER_START }
-  private layer?: Phaser.GameObjects.Container
+  private facing: Direction = 'down'
+  private staticLayer?: Phaser.GameObjects.Container
+  private entityLayer?: Phaser.GameObjects.Container
   private ready = false
+  private inputEnabled = true
+  /** 草地装飾を置かないセル（家/オブジェクトの下）。 */
+  private readonly decalSkip: Set<string> = MapScene.buildDecalSkip()
 
-  constructor(engage: EngageHandler) {
+  private static buildDecalSkip(): Set<string> {
+    const skip = new Set<string>()
+    for (const house of HOUSES) {
+      for (let dy = 0; dy < house.h; dy++) {
+        for (let dx = 0; dx < house.w; dx++) skip.add(cellKey({ x: house.x + dx, y: house.y + dy }))
+      }
+    }
+    for (const obj of MAP_OBJECTS) skip.add(cellKey({ x: obj.x, y: obj.y }))
+    return skip
+  }
+
+  constructor(onInteract: InteractHandler, base = '/') {
     super('map')
-    this.engage = engage
+    this.onInteract = onInteract
+    this.base = base
   }
 
   /** 敵集合を差し替える。create前に呼ばれても保持し、create後は即再描画する。 */
@@ -59,100 +105,385 @@ export class MapScene extends Phaser.Scene {
       enemies.map((enemy) => ({ id: enemy.id, issueNumber: enemy.issueNumber })),
       { cols: GRID.cols, rows: GRID.rows, blocked: RESERVED_CELLS },
     )
-    if (this.ready) this.redraw()
+    if (this.ready) this.drawEntities()
+  }
+
+  preload(): void {
+    for (const key of SPRITE_KEYS) {
+      this.load.image(key, assetUrl(key, this.base))
+    }
+    this.load.spritesheet(TILES_KEY, assetUrl(TILES_KEY, this.base), {
+      frameWidth: TILE_SRC,
+      frameHeight: TILE_SRC,
+    })
   }
 
   create(): void {
-    this.layer = this.add.container(0, 0)
+    this.staticLayer = this.add.container(0, 0)
+    this.entityLayer = this.add.container(0, 0)
     this.ready = true
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => this.onKey(event))
-    this.redraw()
+    // カメラ: 等倍でフィールド全体を表示（境界=ワールド全体なのでスクロールしない）。
+    this.cameras.main.setBounds(0, 0, this.mapWidth(), this.mapHeight())
+    this.cameras.main.setZoom(CAMERA_ZOOM)
+    this.drawStatic()
+    this.drawEntities()
+  }
+
+  /** モーダル表示中など、マップ操作を一時無効化する（入力フィールドへの誤反応を防ぐ）。 */
+  setInputEnabled(enabled: boolean): void {
+    this.inputEnabled = enabled
   }
 
   private onKey(event: KeyboardEvent): void {
-    const dir = KEY_TO_DIR[event.key]
-    if (!dir) return
-    const target = step(this.player, dir, GRID)
-    const enemyId = enemyAtCell(target, this.placements)
-    if (enemyId !== null) {
-      // 敵セルへは踏み込まず戦闘へ遷移する。
-      const enemy = this.enemies.find((candidate) => candidate.id === enemyId)
-      if (enemy) this.engage(enemy.issueNumber)
+    if (!this.inputEnabled) return
+    if (INTERACT_KEYS.has(event.key)) {
+      this.interact()
       return
     }
-    if (target.x === this.player.x && target.y === this.player.y) return
+    const dir = KEY_TO_DIR[event.key]
+    if (!dir) return
+    this.facing = dir
+    const blocked = blockedCells(this.placements)
+    const target = step(this.player, dir, GRID, blocked)
+    // 進めても向きだけ変えても、プレイヤー表示を更新する。
     this.player = target
-    this.redraw()
+    this.drawEntities()
   }
 
-  private redraw(): void {
-    if (!this.layer) return
-    this.layer.removeAll(true)
-    this.drawGrid()
-    this.drawLandmark(LANDMARKS.blacksmith, '🔨', 0x78716c)
-    this.drawLandmark(LANDMARKS.tavern, '🍺', 0x92400e)
-    for (const enemy of this.enemies) {
-      const cell = this.placements.get(enemy.id)
-      if (cell) this.drawEnemy(enemy, cell)
+  /** 向いている隣接セルのNPC（敵/鍛冶屋/酒場/賢者）を判定し、インタラクトを発火する（決定キー）。 */
+  private interact(): void {
+    const front = neighborCell(this.player, this.facing, GRID)
+    if (!front) return
+    const enemyId = enemyAtCell(front, this.placements)
+    if (enemyId !== null) {
+      const enemy = this.enemies.find((candidate) => candidate.id === enemyId)
+      if (enemy)
+        this.onInteract({ kind: 'enemy', enemyId: enemy.id, issueNumber: enemy.issueNumber })
+      return
     }
-    this.drawPlayer()
+    const landmark = landmarkAtCell(front)
+    if (landmark) this.onInteract({ kind: landmark })
   }
 
-  private add2layer(object: Phaser.GameObjects.GameObject): void {
-    this.layer?.add(object)
+  private mapWidth(): number {
+    return GRID.cols * GRID.tile
   }
 
-  private drawGrid(): void {
-    const graphics = this.add.graphics()
-    graphics.lineStyle(1, 0x1e293b, 1)
-    for (let x = 0; x <= GRID.cols; x++) {
-      graphics.lineBetween(x * GRID.tile, 0, x * GRID.tile, GRID.rows * GRID.tile)
-    }
-    for (let y = 0; y <= GRID.rows; y++) {
-      graphics.lineBetween(0, y * GRID.tile, GRID.cols * GRID.tile, y * GRID.tile)
-    }
-    this.add2layer(graphics)
+  private mapHeight(): number {
+    return GRID.rows * GRID.tile
   }
 
   private cellCenter(cell: Cell): { cx: number; cy: number } {
     return { cx: cell.x * GRID.tile + GRID.tile / 2, cy: cell.y * GRID.tile + GRID.tile / 2 }
   }
 
-  private drawLandmark(cell: Cell, glyph: string, color: number): void {
-    const { cx, cy } = this.cellCenter(cell)
-    const rect = this.add.rectangle(cx, cy, GRID.tile - 6, GRID.tile - 6, color, 0.5)
-    const text = this.add.text(cx, cy, glyph, { fontSize: '22px' }).setOrigin(0.5)
-    this.add2layer(rect)
-    this.add2layer(text)
+  // ----- 静的レイヤー（地形 / オブジェクト / 家）。一度だけ描く -----
+
+  private drawStatic(): void {
+    if (!this.staticLayer) return
+    this.staticLayer.removeAll(true)
+    if (!this.textures.exists(TILES_KEY)) {
+      // タイル未ロード時は草色一枚でフォールバック。
+      const w = this.mapWidth()
+      const h = this.mapHeight()
+      this.staticLayer.add(this.add.rectangle(w / 2, h / 2, w, h, 0x5a8c3a))
+      return
+    }
+    this.drawTerrain()
+    this.drawObjects()
+    for (const house of HOUSES) this.drawHouse(house)
   }
 
-  private drawEnemy(enemy: Enemy, cell: Cell): void {
+  /** タイル1枚を静的レイヤーへ描く（隙間防止に +1）。 */
+  private putTile(cell: Cell, frame: number, dyCells = 0): Phaser.GameObjects.Image {
     const { cx, cy } = this.cellCenter(cell)
-    const defeated = enemy.status === 'defeated'
-    const color = defeated ? 0x475569 : DIFFICULTY_COLOR[enemy.difficulty]
-    const rect = this.add.rectangle(
+    const image = this.add
+      .image(cx, cy + dyCells * GRID.tile, TILES_KEY, frame)
+      .setDisplaySize(GRID.tile + 1, GRID.tile + 1)
+    this.staticLayer?.add(image)
+    return image
+  }
+
+  /** 草地マスのフレームを決定的に散らす（単調さ解消）。オブジェクト下は無地でよい。 */
+  private grassFrame(x: number, y: number): number {
+    if (this.decalSkip.has(cellKey({ x, y }))) return GRASS
+    // 決定的ハッシュで一部だけ無地/装飾に差し替える。
+    const h = (x * 73856093) ^ (y * 19349663)
+    const r = (h >>> 0) % 17
+    if (r === 0 || r === 5) return GRASS_DETAILS[r === 0 ? 0 : 1] ?? GRASS
+    if (r === 9 || r === 13) return GRASS_PLAIN
+    return GRASS
+  }
+
+  private drawTerrain(): void {
+    const isPathLike = (x: number, y: number) => {
+      const t = terrainAt(x, y)
+      return t === 'path' || t === 'bridge'
+    }
+    const isWaterLike = (x: number, y: number) => {
+      const t = terrainAt(x, y)
+      return t === 'water' || t === 'bridge'
+    }
+    for (let y = 0; y < GRID.rows; y++) {
+      for (let x = 0; x < GRID.cols; x++) {
+        const cell = { x, y }
+        // ベースは草地（少しだけ装飾を散らす）。
+        this.putTile(cell, this.grassFrame(x, y))
+        const t = terrainAt(x, y)
+        if (t === 'water' || t === 'bridge') {
+          // 水/橋の下は川（オートタイルで縁取り）。
+          const frame = pickAutoTile(
+            WATER,
+            isWaterLike(x, y - 1),
+            isWaterLike(x, y + 1),
+            isWaterLike(x - 1, y),
+            isWaterLike(x + 1, y),
+          )
+          this.putTile(cell, frame)
+          if (t === 'bridge') this.putTile(cell, BRIDGE)
+        } else if (t === 'path') {
+          const frame = pickAutoTile(
+            PATH,
+            isPathLike(x, y - 1),
+            isPathLike(x, y + 1),
+            isPathLike(x - 1, y),
+            isPathLike(x + 1, y),
+          )
+          this.putTile(cell, frame)
+        }
+      }
+    }
+  }
+
+  /** 設置物の足元に楕円の影を落として地面に馴染ませる。 */
+  private addShadow(
+    layer: Phaser.GameObjects.Container | undefined,
+    cell: Cell,
+    widthRatio = 0.6,
+    yOffset = 0.3,
+  ): void {
+    const { cx, cy } = this.cellCenter(cell)
+    const shadow = this.add.ellipse(
       cx,
-      cy,
-      GRID.tile - 8,
-      GRID.tile - 8,
-      color,
-      defeated ? 0.4 : 0.9,
+      cy + GRID.tile * yOffset,
+      GRID.tile * widthRatio,
+      GRID.tile * 0.24,
+      0x000000,
+      0.28,
     )
-    rect.setStrokeStyle(2, 0x0f172a)
+    layer?.add(shadow)
+  }
+
+  private drawObjects(): void {
+    for (const obj of MAP_OBJECTS) {
+      // 足元に影。
+      this.addShadow(
+        this.staticLayer,
+        { x: obj.x, y: obj.y },
+        obj.canopy !== undefined ? 0.5 : 0.55,
+      )
+      // 木は樹冠を1マス上に重ねて高さを出す。
+      if (obj.canopy !== undefined) {
+        this.putTile({ x: obj.x, y: obj.y }, obj.canopy, -1)
+      }
+      this.putTile({ x: obj.x, y: obj.y }, obj.frame)
+    }
+  }
+
+  private drawHouse(house: House): void {
+    const { x, y, w, h } = house
+    // 足元（最下段）に横長の影。
+    const baseY = y + h - 1
+    for (let dx = 0; dx < w; dx++)
+      this.addShadow(this.staticLayer, { x: x + dx, y: baseY }, 0.92, 0.34)
+    // 鍛冶屋は石造（灰色）、他は木造（茶色）。
+    const isStone = house.kind === 'blacksmith'
+    const roof = isStone ? HOUSE_TILES.roofGray : HOUSE_TILES.roof
+    const wall = isStone ? HOUSE_TILES.wallGray : HOUSE_TILES.wall
+    // 屋根（最上段）。
+    for (let dx = 0; dx < w; dx++) this.putTile({ x: x + dx, y }, roof)
+    // 壁（残り段）。
+    for (let dy = 1; dy < h; dy++) {
+      for (let dx = 0; dx < w; dx++) this.putTile({ x: x + dx, y: y + dy }, wall)
+    }
+    // 窓（扉のない壁段の左右）。2階建ては各階に付く。
+    for (let dy = 1; dy < h - 1; dy++) {
+      this.putTile({ x, y: y + dy }, HOUSE_TILES.window)
+      this.putTile({ x: x + w - 1, y: y + dy }, HOUSE_TILES.window)
+    }
+    // 扉（最下段中央）。
+    const doorX = x + Math.floor(w / 2)
+    const doorY = y + h - 1
+    this.putTile({ x: doorX, y: doorY }, HOUSE_TILES.door)
+
+    // 種別ごとの装飾で形を差別化する。
+    if (house.kind === 'blacksmith') this.drawChimney(x + w - 1, y)
+    if (house.kind === 'sage') this.drawGable(x, y, w)
+    if (house.kind === 'tavern') this.drawInnSign(doorX, y)
+  }
+
+  /** 鍛冶屋の煙突＋立ち上る煙。 */
+  private drawChimney(cellX: number, cellY: number): void {
+    const { cx, cy } = this.cellCenter({ x: cellX, y: cellY })
+    const t = GRID.tile
+    const stack = this.add
+      .rectangle(cx, cy - t * 0.25, t * 0.3, t * 0.55, 0x4a4a4a)
+      .setStrokeStyle(2, 0x262626)
+    this.staticLayer?.add(stack)
+    const cap = this.add.rectangle(cx, cy - t * 0.5, t * 0.42, t * 0.16, 0x2f2f2f)
+    this.staticLayer?.add(cap)
+    // 立ち上る煙（上昇しながら薄くなるループ）。
+    const baseY = cy - t * 0.55
+    for (let i = 0; i < 3; i++) {
+      const puff = this.add.circle(cx, baseY, t * 0.12, 0xd9d9d9, 0.0)
+      this.staticLayer?.add(puff)
+      this.tweens.add({
+        targets: puff,
+        y: baseY - t * 1.1,
+        x: cx + (i % 2 === 0 ? -t * 0.18 : t * 0.18),
+        scale: { from: 0.5, to: 1.4 },
+        alpha: { from: 0.5, to: 0 },
+        duration: 2200,
+        delay: i * 700,
+        repeat: -1,
+        ease: 'Sine.out',
+      })
+    }
+  }
+
+  /** 賢者の家の切妻（とがり屋根）。 */
+  private drawGable(x: number, y: number, w: number): void {
+    const t = GRID.tile
+    const left = x * t
+    const right = (x + w) * t
+    const apexX = (x + w / 2) * t
+    const baseY = y * t + 2
+    const apexY = y * t - t * 0.85
+    const g = this.add.graphics()
+    g.fillStyle(0x7c6fae, 1)
+    g.fillTriangle(left, baseY, right, baseY, apexX, apexY)
+    g.lineStyle(2, 0x4c3f7e)
+    g.strokeTriangle(left, baseY, right, baseY, apexX, apexY)
+    this.staticLayer?.add(g)
+  }
+
+  /** 酒場の INN 看板（扉の上）。 */
+  private drawInnSign(doorX: number, roofY: number): void {
+    const { cx, cy } = this.cellCenter({ x: doorX, y: roofY })
     const label = this.add
-      .text(cx, cy + GRID.tile / 2 - 6, `#${enemy.issueNumber}`, {
-        fontSize: '10px',
-        color: '#e2e8f0',
+      .text(cx, cy - GRID.tile * 0.1, 'INN', {
+        fontFamily: 'monospace',
+        fontSize: `${Math.round(GRID.tile * 0.32)}px`,
+        color: '#3b2412',
+        fontStyle: 'bold',
       })
       .setOrigin(0.5)
-    this.add2layer(rect)
-    this.add2layer(label)
+    this.staticLayer?.add(label)
   }
 
+  // ----- エンティティレイヤー（敵 / プレイヤー）。毎手番で再描画 -----
+
+  private drawEntities(): void {
+    if (!this.entityLayer) return
+    this.entityLayer.removeAll(true)
+    this.enemies.forEach((enemy, index) => {
+      const cell = this.placements.get(enemy.id)
+      if (cell) this.drawEnemy(enemy, cell, index)
+    })
+    this.drawPlayer()
+    this.drawInteractPrompt()
+  }
+
+  private drawEntitySprite(
+    cell: Cell,
+    key: AssetKey,
+    size: number,
+  ): Phaser.GameObjects.Image | null {
+    if (!this.textures.exists(key)) return null
+    const { cx, cy } = this.cellCenter(cell)
+    const image = this.add.image(cx, cy, key).setDisplaySize(size, size)
+    this.entityLayer?.add(image)
+    return image
+  }
+
+  /** スプライトを上下にゆっくり揺らして生きている感を出す（次の再描画で破棄→再生成）。 */
+  private bob(image: Phaser.GameObjects.Image, delayMs: number): void {
+    this.tweens.add({
+      targets: image,
+      y: image.y - 3,
+      duration: 820,
+      delay: delayMs,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+    })
+  }
+
+  private drawEnemy(enemy: Enemy, cell: Cell, index: number): void {
+    this.addShadow(this.entityLayer, cell, 0.5, 0.34)
+    const image = this.drawEntitySprite(cell, enemyAssetKey(enemy.difficulty), GRID.tile - 4)
+    if (!image) return
+    if (enemy.status === 'defeated') {
+      image.setAlpha(0.35).setTint(0x94a3b8)
+    } else {
+      this.bob(image, (index % 4) * 200)
+    }
+  }
+
+  /** プレイヤーはキャラスプライト（Tiny Dungeonの勇者）＋向きを示す小ドット。 */
   private drawPlayer(): void {
     const { cx, cy } = this.cellCenter(this.player)
-    const circle = this.add.circle(cx, cy, GRID.tile / 2 - 8, 0xfacc15)
-    circle.setStrokeStyle(2, 0x713f12)
-    this.add2layer(circle)
+    this.addShadow(this.entityLayer, this.player, 0.5, 0.34)
+    const drawn = this.drawEntitySprite(this.player, 'player', GRID.tile - 6)
+    if (!drawn) {
+      const circle = this.add
+        .circle(cx, cy, GRID.tile / 2 - 10, 0xfacc15)
+        .setStrokeStyle(2, 0x713f12)
+      this.entityLayer?.add(circle)
+    } else {
+      if (this.facing === 'left') drawn.setFlipX(true)
+      this.bob(drawn, 0)
+    }
+
+    const FACING_OFFSET: Record<Direction, [number, number]> = {
+      up: [0, -1],
+      down: [0, 1],
+      left: [-1, 0],
+      right: [1, 0],
+    }
+    const [dx, dy] = FACING_OFFSET[this.facing]
+    const edge = GRID.tile / 2 - 4
+    const dot = this.add
+      .circle(cx + dx * edge, cy + dy * edge, 3, 0xfacc15)
+      .setStrokeStyle(1, 0x713f12)
+    this.entityLayer?.add(dot)
+  }
+
+  /** 向いている隣接マスが会話可能（敵/施設）なら、頭上に揺れる目印を出す。 */
+  private drawInteractPrompt(): void {
+    const front = neighborCell(this.player, this.facing, GRID)
+    if (!front) return
+    const interactable =
+      enemyAtCell(front, this.placements) !== null || landmarkAtCell(front) !== null
+    if (!interactable) return
+    const { cx, cy } = this.cellCenter(front)
+    const marker = this.add
+      .text(cx, cy - GRID.tile * 0.62, '▼', {
+        fontFamily: 'monospace',
+        fontSize: `${Math.round(GRID.tile * 0.42)}px`,
+        color: '#f4d06a',
+      })
+      .setOrigin(0.5)
+      .setStroke('#3a2a08', 4)
+    this.entityLayer?.add(marker)
+    this.tweens.add({
+      targets: marker,
+      y: marker.y - 5,
+      duration: 480,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+    })
   }
 }

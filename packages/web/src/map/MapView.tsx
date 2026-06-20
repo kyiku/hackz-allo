@@ -2,29 +2,32 @@ import type { Enemy } from '@github-issue-rpg/shared'
 import Phaser from 'phaser'
 import { useEffect, useRef } from 'react'
 import { GRID } from './grid'
-import { MapScene } from './MapScene'
+import { MapScene, type InteractHandler } from './MapScene'
 
 interface MapViewProps {
   enemies: Enemy[]
-  /** 敵接触時のハンドラ（issue番号で鍛冶屋依頼＝戦闘開始）。 */
-  onEngage: (issueNumber: number) => void
+  /** NPCインタラクト時のハンドラ（敵/鍛冶屋/酒場/賢者）。 */
+  onInteract: InteractHandler
+  /** モーダル表示中などマップ操作を止めるか（キー入力の誤反応防止）。 */
+  paused?: boolean
 }
 
 /**
- * Phaserマップを React にマウントするラッパー（タスク10.2）。
+ * Phaserマップを React にマウントするラッパー（タスク#117）。
+ * 親要素いっぱいにフルスクリーン表示（Scale.FIT＋pixelArtでピクセルパーフェクト）。
  * Phaser.Game の生成は一度だけ。敵集合の更新はシーンへ流し込み再描画する。
- * onEngage は ref 経由で最新を参照し、ゲーム再生成を避ける。
+ * onInteract は ref 経由で最新を参照し、ゲーム再生成を避ける。
  */
-export function MapView({ enemies, onEngage }: MapViewProps) {
+export function MapView({ enemies, onInteract, paused = false }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<MapScene | null>(null)
-  const onEngageRef = useRef(onEngage)
-  onEngageRef.current = onEngage
+  const onInteractRef = useRef(onInteract)
+  onInteractRef.current = onInteract
 
   useEffect(() => {
     const parent = containerRef.current
     if (!parent) return
-    const scene = new MapScene((issueNumber) => onEngageRef.current(issueNumber))
+    const scene = new MapScene((target) => onInteractRef.current(target), import.meta.env.BASE_URL)
     sceneRef.current = scene
     const game = new Phaser.Game({
       type: Phaser.AUTO,
@@ -32,6 +35,14 @@ export function MapView({ enemies, onEngage }: MapViewProps) {
       width: GRID.cols * GRID.tile,
       height: GRID.rows * GRID.tile,
       backgroundColor: '#0f172a',
+      // ドット絵をにじませない（pixel-perfect表示）。
+      pixelArt: true,
+      // フィールド全体(width×height)をアスペクト比を保ったまま画面に収める（FIT）。
+      // 画面より小さい余白はピルラー/レターボックスとして backgroundColor で塗られる。
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+      },
       scene,
     })
     return () => {
@@ -44,16 +55,9 @@ export function MapView({ enemies, onEngage }: MapViewProps) {
     sceneRef.current?.setEnemies(enemies)
   }, [enemies])
 
-  return (
-    <div className="flex flex-col gap-2">
-      <div
-        ref={containerRef}
-        className="overflow-hidden rounded-lg border border-slate-700"
-        style={{ width: GRID.cols * GRID.tile, height: GRID.rows * GRID.tile }}
-      />
-      <p className="text-xs text-slate-500">
-        矢印キー / WASD で移動。敵に接触すると鍛冶屋依頼（戦闘）が始まります。
-      </p>
-    </div>
-  )
+  useEffect(() => {
+    sceneRef.current?.setInputEnabled(!paused)
+  }, [paused])
+
+  return <div ref={containerRef} className="h-full w-full" />
 }
