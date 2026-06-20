@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * Playwright E2E 設定（タスク12.1）。
+ * Playwright E2E 設定（タスク12.1 / 12.3）。
  * ビルド済みの web を vite preview で配信し、ブラウザから実アプリを駆動する。
  * Backend/Runner は `e2e/mock-ws.ts` の WebSocket モックで差し替え、外部依存なしで決定的に検証する。
  */
