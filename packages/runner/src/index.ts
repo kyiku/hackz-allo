@@ -16,7 +16,8 @@ import { createAgentStructuredGeneratorWithSdk } from './ai/index.js'
 import { createNodeForgeBattle } from './battle/index.js'
 import { loadConfig, type RunnerConfig } from './config/index.js'
 import { createGitHubGateway, createOctokit } from './github/index.js'
-import { fetchOpenIssues } from './world/index.js'
+import { fetchOpenIssues, parseRepoUrl, removedIssueNumbers } from './world/index.js'
+import type { BackendClient } from './orchestration/backend-client.js'
 import {
   createDatabase,
   createEquipmentRepository,
@@ -53,8 +54,12 @@ function buildJobContext(config: RunnerConfig): JobContext {
   const backend = createHttpBackendClient(BACKEND_URL)
   const generator = createAgentStructuredGeneratorWithSdk()
   const gateway = createGitHubGateway({ octokit: createOctokit(config.githubPat) })
-  // 接続中リポジトリの可変状態（onConnect が設定し、forgeBattle が参照する）。
-  const session: { repoUrl: string | null } = { repoUrl: null }
+  // 接続中リポジトリの可変状態（onConnect が設定し、forgeBattle/ポーラーが参照する）。
+  const session: { repoUrl: string | null; enemyIssueNumbers: Set<number> } = {
+    repoUrl: null,
+    enemyIssueNumbers: new Set(),
+  }
+  startWorldPoller({ session, backend, githubPat: config.githubPat })
   const forgeBattle = createNodeForgeBattle({
     githubPat: config.githubPat,
     generator,
@@ -88,6 +93,37 @@ function buildJobContext(config: RunnerConfig): JobContext {
     forgeBattle,
     playerId: player.id,
   }
+}
+
+/** ワールド更新間隔(ms)。一定間隔で open issue を取得し、閉じた敵を撤去する（要件5.2）。 */
+const WORLD_POLL_INTERVAL = 20000
+
+/**
+ * 接続中リポジトリの open issue を定期取得し、クローズされた issue の敵を enemy.removed で撤去する。
+ * LLMは呼ばず番号集合の差分だけを見るので軽量。新規追加は onConnect / 酒場が担う。
+ */
+function startWorldPoller(deps: {
+  session: { repoUrl: string | null; enemyIssueNumbers: Set<number> }
+  backend: BackendClient
+  githubPat: string
+}): void {
+  setInterval(() => {
+    const repoUrl = deps.session.repoUrl
+    if (!repoUrl) return
+    void (async () => {
+      try {
+        const { owner, name } = parseRepoUrl(repoUrl)
+        const issues = await fetchOpenIssues(deps.githubPat, { owner, name })
+        const current = new Set(issues.map((issue) => issue.number))
+        for (const removed of removedIssueNumbers(deps.session.enemyIssueNumbers, current)) {
+          await deps.backend.emit({ type: 'enemy.removed', enemyId: removed })
+        }
+        deps.session.enemyIssueNumbers = current
+      } catch {
+        // 一時的な取得失敗は無視（次の周期で再試行）。
+      }
+    })()
+  }, WORLD_POLL_INTERVAL)
 }
 
 function main(): void {

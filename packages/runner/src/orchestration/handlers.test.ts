@@ -44,7 +44,7 @@ function makeContext(loadout?: Loadout): {
     generator: { generate },
     fetchIssues: vi.fn(async () => []),
     createIssue: vi.fn(async () => ({ number: 7, url: 'https://github.com/o/r/issues/7' })),
-    session: { repoUrl: null },
+    session: { repoUrl: null, enemyIssueNumbers: new Set<number>() },
     forgeBattle: vi.fn(async () => {}),
     playerId: 1,
   }

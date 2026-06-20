@@ -32,3 +32,4 @@ export {
   type ConnectWorldDeps,
   type WorldStateEvent,
 } from './connect-world.js'
+export { removedIssueNumbers } from './issue-poll.js'

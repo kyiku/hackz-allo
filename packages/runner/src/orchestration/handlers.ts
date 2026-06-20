@@ -70,8 +70,8 @@ export interface JobContext {
     name: string,
     draft: { title: string; body: string; labels: string[] },
   ): Promise<{ number: number; url: string }>
-  /** 現在接続中リポジトリの可変状態（onConnect が設定、onForge が参照）。 */
-  session: { repoUrl: string | null }
+  /** 現在接続中リポジトリの可変状態（onConnect が設定、onForge/ポーラーが参照）。 */
+  session: { repoUrl: string | null; enemyIssueNumbers: Set<number> }
   /** cmd.forge の実体（clone→Claude→テスト→PR）。実依存は外側で注入する。 */
   forgeBattle(issueNumber: number): Promise<void>
   /** 単一プレイヤー前提のデモにおける対象プレイヤーID。 */
@@ -147,6 +147,7 @@ export function createJobHandlers(ctx: JobContext): JobHandlers {
         status: 'active',
       }
       await ctx.backend.emit({ type: 'enemy.appeared', enemy })
+      ctx.session.enemyIssueNumbers.add(created.number)
     },
 
     async onLoadoutEquip(equipmentId: number, equipped: boolean): Promise<void> {
@@ -188,8 +189,9 @@ export function createJobHandlers(ctx: JobContext): JobHandlers {
           repoUrl,
         )
         await ctx.backend.emit(event)
-        // 接続成功したリポジトリを記憶し、以降の cmd.forge の対象にする。
+        // 接続成功したリポジトリと敵集合を記憶（forge対象＋ポーリング差分の基準）。
         ctx.session.repoUrl = repoUrl
+        ctx.session.enemyIssueNumbers = new Set(event.enemies.map((enemy) => enemy.issueNumber))
       } catch (error) {
         await ctx.backend.emit({
           type: 'connect.error',
