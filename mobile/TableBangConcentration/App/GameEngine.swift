@@ -26,6 +26,9 @@ final class GameEngine: ObservableObject {
     /// 配置可能な水平面を検出済みか（配置ガイド表示に使う, R1-5）。
     @Published private(set) var isPlaneReady: Bool = false
 
+    /// 台パン成立イベント（2D報酬ゲーム等で「1回振り下ろした」入力として使う）。
+    let swings: AnyPublisher<Void, Never>
+
     /// 報酬モードの報酬カード仕様（nil なら通常の神経衰弱）。
     private let rewardSpecs: [RewardCardSpec]?
 
@@ -65,6 +68,7 @@ final class GameEngine: ObservableObject {
             feedback: feedback
         )
 
+        self.swings = swingDetector.punches.map { _ in () }.eraseToAnyPublisher()
         self.scene = scene
         self.cardManager = cardManager
         self.gameState = gameState
