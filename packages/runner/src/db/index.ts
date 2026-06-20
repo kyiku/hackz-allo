@@ -8,3 +8,9 @@ export {
   type NpcDialogueRepository,
   type NpcDialogue,
 } from './repositories/npc-dialogue-repository.js'
+export {
+  createWorkLogRepository,
+  saveWorkLog,
+  type WorkLogRepository,
+  type WorkLog,
+} from './repositories/work-log-repository.js'
