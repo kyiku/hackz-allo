@@ -5,3 +5,11 @@ export {
   type GenerateOptions,
 } from './structured-generator.js'
 export { createAnthropic, createAnthropicStructuredGenerator } from './anthropic-factory.js'
+export {
+  buildForgeOptions,
+  runForge,
+  type ForgeOptions,
+  type QueryLike,
+  type RunForgeParams,
+} from './forge-agent.js'
+export { runForgeWithSdk } from './forge-factory.js'
