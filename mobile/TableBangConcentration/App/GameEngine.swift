@@ -37,8 +37,9 @@ final class GameEngine: ObservableObject {
     static func reward(specs: [RewardCardSpec], maxSwings: Int = 3) -> GameEngine {
         var config = GameConfig.default
         config.maxSwings = maxSwings
-        config.cardSize = SIMD3<Float>(0.10, 0.004, 0.14)
-        config.cardSpacing = 0.16
+        // 標準(0.05×0.07)より少し大きい程度。大きすぎると画面に収まらず近く見える。
+        config.cardSize = SIMD3<Float>(0.07, 0.003, 0.10)
+        config.cardSpacing = 0.115
         return GameEngine(config: config, rewardSpecs: specs)
     }
 

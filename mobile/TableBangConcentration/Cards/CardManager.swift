@@ -41,7 +41,8 @@ final class CardManager: CardManaging {
     /// 報酬デッキ（能力ペア）で盤面を組む。少数枚なので列数は内容に合わせて詰める。
     func buildRewardBoard(specs: [RewardCardSpec], config: GameConfig) {
         let deck = DeckFactory.makeRewardDeck(specs: specs)
-        let columns = max(2, min(deck.count, 4))
+        // 6枚程度なら3列（3×2）にして正方形に近いコンパクトな盤面にする。
+        let columns = max(2, min(deck.count, 3))
         install(deck: deck, columns: columns, config: config)
     }
 
