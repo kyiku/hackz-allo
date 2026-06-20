@@ -63,6 +63,20 @@ describe('parseServerEvent', () => {
       parseServerEvent({ type: 'connect.error', reason: 'bogus', message: 'x' }),
     ).toThrow()
   })
+
+  it('npc.dialogue をパースする', () => {
+    const event = {
+      type: 'npc.dialogue',
+      enemyId: 10,
+      dialogue: {
+        summary: 'ログインが遅い',
+        difficultyNote: 'N+1クエリ',
+        files: ['src/auth.ts'],
+        winCondition: '応答が200ms以内',
+      },
+    }
+    expect(parseServerEvent(event)).toEqual(event)
+  })
 })
 
 describe('parseClientEvent', () => {
@@ -111,6 +125,11 @@ describe('parseClientEvent', () => {
   it('cmd.loadout.tune の未知 permissionMode を拒否する', () => {
     const event = { type: 'cmd.loadout.tune', tuning: { permissionMode: 'bogus' } }
     expect(() => parseClientEvent(event)).toThrow()
+  })
+
+  it('cmd.npc.talk をパースする', () => {
+    const event = { type: 'cmd.npc.talk', enemyId: 10 }
+    expect(parseClientEvent(event)).toEqual(event)
   })
 })
 

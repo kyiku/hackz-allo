@@ -1,8 +1,8 @@
 import type { ClientEvent, IssueDraft, LoadoutTuning } from '@github-issue-rpg/shared'
 
 /**
- * Runnerジョブのオーケストレーション（要件5.4, 5.5, 5.9, 5.1, 5.10）。
- * クライアントイベント（cmd.forge/spell/stop/tavern/tavern.publish/loadout/connect）を対応ハンドラへディスパッチする。
+ * Runnerジョブのオーケストレーション（要件5.4, 5.5, 5.9, 5.1, 5.10, 5.3）。
+ * クライアントイベント（cmd.forge/spell/stop/tavern/tavern.publish/loadout/npc/connect）を対応ハンドラへディスパッチする。
  * issueポーリングはRunner実体側、Backendはスケジュールとresult反映のみ。
  */
 
@@ -14,6 +14,7 @@ export interface JobHandlers {
   onTavernPublish(draft: IssueDraft): Promise<void>
   onLoadoutEquip(equipmentId: number, equipped: boolean): Promise<void>
   onLoadoutTune(tuning: LoadoutTuning): Promise<void>
+  onNpcTalk(enemyId: number): Promise<void>
   onConnect(repoUrl: string): Promise<void>
 }
 
@@ -40,6 +41,8 @@ export function createJobDispatcher(handlers: JobHandlers): JobDispatcher {
           return handlers.onLoadoutEquip(event.equipmentId, event.equipped)
         case 'cmd.loadout.tune':
           return handlers.onLoadoutTune(event.tuning)
+        case 'cmd.npc.talk':
+          return handlers.onNpcTalk(event.enemyId)
         case 'cmd.connect':
           return handlers.onConnect(event.repoUrl)
         default: {

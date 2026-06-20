@@ -18,6 +18,7 @@ export const clientEventSchema = z.discriminatedUnion('type', [
     equipped: z.boolean(),
   }),
   z.object({ type: z.literal('cmd.loadout.tune'), tuning: loadoutTuningSchema }),
+  z.object({ type: z.literal('cmd.npc.talk'), enemyId: z.number().int() }),
   z.object({ type: z.literal('cmd.connect'), repoUrl: z.string().url() }),
 ])
 export type ClientEvent = z.infer<typeof clientEventSchema>
