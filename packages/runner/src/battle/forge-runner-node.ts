@@ -149,6 +149,11 @@ export function createNodeForgeBattle(
       async publish({ worktreePath, branch, issue }) {
         const git = simpleGit(worktreePath)
         await git.add('.')
+        // 変更が無ければ（＝既に実装済み等）PR作成が GitHub 側で失敗するため、先に明快に弾く。
+        const status = await git.status()
+        if (status.isClean()) {
+          throw new Error('変更がありません（このissueは既に解決済みの可能性があります）')
+        }
         await git.commit(`feat: #${issue.number} ${issue.title} をTDDで解決`)
         await git.push('origin', branch)
         const connection = await gateway.connectRepository(repo)
