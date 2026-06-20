@@ -1,8 +1,15 @@
 import { useEffect } from 'react'
+import { sound } from '../audio/sound'
 
 interface TitleScreenProps {
   /** 「はじめる」押下（リポジトリ選択へ進む）。 */
   onStart: () => void
+}
+
+/** 開始時に決定SEを鳴らしてから遷移する。 */
+function start(onStart: () => void): void {
+  sound.playSfx('select')
+  onStart()
 }
 
 /**
@@ -12,7 +19,7 @@ interface TitleScreenProps {
 export function TitleScreen({ onStart }: TitleScreenProps) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Enter' || event.key === ' ') onStart()
+      if (event.key === 'Enter' || event.key === ' ') start(onStart)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -40,7 +47,7 @@ export function TitleScreen({ onStart }: TitleScreenProps) {
       </div>
       <button
         type="button"
-        onClick={onStart}
+        onClick={() => start(onStart)}
         className="rpg-btn rpg-btn-gold relative px-10 py-3 text-base"
       >
         <span aria-hidden>▶</span> はじめる

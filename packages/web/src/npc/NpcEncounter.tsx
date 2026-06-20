@@ -1,5 +1,29 @@
+import type { Enemy } from '@github-issue-rpg/shared'
 import { useGameStore } from '../store/gameStore'
 import { enemyName } from './enemyName'
+
+/**
+ * DEV/デモ限定の足場：バックエンドが無い「demo」ワールドでも戦闘画面を確認できるよう、
+ * 「戦う」時にローカルで戦闘を1つ起こす。本番(cmd.forge→backend)のロジックには一切関与しない。
+ */
+function startDemoBattle(enemy: Enemy): void {
+  const { world, ingest } = useGameStore.getState()
+  if (!import.meta.env.DEV || world?.repoOwner !== 'demo') return
+  const battleId = `demo-b${enemy.id}`
+  ingest({ type: 'battle.started', battleId, enemyId: enemy.id, hpTotal: enemy.hpTotal })
+  ingest({
+    type: 'battle.log',
+    battleId,
+    line: `${enemyName(enemy.difficulty, enemy.issueNumber)} との戦闘開始！`,
+    kind: 'system',
+  })
+  ingest({
+    type: 'battle.log',
+    battleId,
+    line: '呪文（追加指示）を詠唱して攻略しよう。（デモ表示）',
+    kind: 'info',
+  })
+}
 
 interface NpcEncounterProps {
   enemyId: number
@@ -60,6 +84,7 @@ export function NpcEncounter({ enemyId, onClose }: NpcEncounterProps) {
           type="button"
           onClick={() => {
             send({ type: 'cmd.forge', issueNumber: enemy.issueNumber })
+            startDemoBattle(enemy)
             onClose()
           }}
           className="rpg-btn rpg-btn-amber"
