@@ -1,0 +1,22 @@
+name: CI
+
+# auto-merge は「必須チェック成功後にマージ」を実現するため、
+# このワークフローを required status check に設定する（scripts/setup-repo.sh 参照）。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: npm install
+      - name: Test
+        run: npm test
