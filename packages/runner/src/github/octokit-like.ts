@@ -32,6 +32,7 @@ export interface PullCreateResult {
 }
 
 export interface OctokitLike {
+  graphql<T = unknown>(query: string, variables?: Record<string, unknown>): Promise<T>
   rest: {
     repos: {
       get(params: { owner: string; repo: string }): Promise<RepoGetResult>
@@ -44,6 +45,14 @@ export interface OctokitLike {
         per_page?: number
       }): Promise<{ data: IssueListItem[] }>
     }
+    checks: {
+      listForRef(params: {
+        owner: string
+        repo: string
+        ref: string
+        per_page?: number
+      }): Promise<{ data: { total_count: number; check_runs: Array<{ status: string; conclusion: string | null }> } }>
+    }
     pulls: {
       create(params: {
         owner: string
@@ -53,14 +62,12 @@ export interface OctokitLike {
         base: string
         body?: string
       }): Promise<PullCreateResult>
-    }
-    checks: {
-      listForRef(params: {
+      merge(params: {
         owner: string
         repo: string
-        ref: string
-        per_page?: number
-      }): Promise<{ data: { total_count: number; check_runs: Array<{ status: string; conclusion: string | null }> } }>
+        pull_number: number
+        merge_method?: 'merge' | 'squash' | 'rebase'
+      }): Promise<unknown>
     }
   }
 }

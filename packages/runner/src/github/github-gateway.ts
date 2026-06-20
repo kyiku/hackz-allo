@@ -1,4 +1,5 @@
 import type { RepoRef } from '@github-issue-rpg/shared'
+import { enableAutoMergeWithFallback, type AutoMergeResult } from './auto-merge.js'
 import { aggregateCheckRuns, type CIStatus } from './ci-status.js'
 import type { IssueListItem, OctokitLike } from './octokit-like.js'
 import type { CreatePullRequestParams, GitHubIssue, PullRequest, RepoConnection } from './types.js'
@@ -7,11 +8,30 @@ export interface GitHubGatewayDeps {
   octokit: OctokitLike
 }
 
+/** auto-merge 有効化のパラメータ。 */
+export interface EnableAutoMergeParams {
+  repo: RepoRef
+  prNumber: number
+  /** PR の node_id（GraphQL用）。 */
+  nodeId: string
+  /** CI状態を確認する ref（PR head の sha/branch）。 */
+  headRef: string
+}
+
+const ENABLE_AUTO_MERGE_MUTATION = `
+  mutation EnableAutoMerge($prId: ID!) {
+    enablePullRequestAutoMerge(input: { pullRequestId: $prId, mergeMethod: SQUASH }) {
+      pullRequest { id }
+    }
+  }
+`
+
 export interface GitHubGateway {
   listIssues(repo: RepoRef): Promise<GitHubIssue[]>
   connectRepository(repo: RepoRef): Promise<RepoConnection>
   createPullRequest(params: CreatePullRequestParams): Promise<PullRequest>
   getCIStatus(repo: RepoRef, ref: string): Promise<CIStatus>
+  enableAutoMerge(params: EnableAutoMergeParams): Promise<AutoMergeResult>
 }
 
 /** 本文に対象issueの closing keyword を保証する（マージ時にissue自動close）。 */
@@ -51,6 +71,16 @@ function statusOf(error: unknown): number | undefined {
  * 認証情報(PAT)は呼び出し側が Octokit に注入する（Runner プロセス内のみ）。
  */
 export function createGitHubGateway({ octokit }: GitHubGatewayDeps): GitHubGateway {
+  async function fetchCIStatus(repo: RepoRef, ref: string): Promise<CIStatus> {
+    const { data } = await octokit.rest.checks.listForRef({
+      owner: repo.owner,
+      repo: repo.name,
+      ref,
+      per_page: 100,
+    })
+    return aggregateCheckRuns(data.check_runs)
+  }
+
   return {
     async listIssues(repo) {
       const { data } = await octokit.rest.issues.listForRepo({
@@ -110,13 +140,24 @@ export function createGitHubGateway({ octokit }: GitHubGatewayDeps): GitHubGatew
     },
 
     async getCIStatus(repo, ref) {
-      const { data } = await octokit.rest.checks.listForRef({
-        owner: repo.owner,
-        repo: repo.name,
-        ref,
-        per_page: 100,
+      return fetchCIStatus(repo, ref)
+    },
+
+    async enableAutoMerge({ repo, prNumber, nodeId, headRef }) {
+      return enableAutoMergeWithFallback({
+        tryEnableAutoMerge: async () => {
+          await octokit.graphql(ENABLE_AUTO_MERGE_MUTATION, { prId: nodeId })
+        },
+        getCIStatus: () => fetchCIStatus(repo, headRef),
+        squashMerge: async () => {
+          await octokit.rest.pulls.merge({
+            owner: repo.owner,
+            repo: repo.name,
+            pull_number: prNumber,
+            merge_method: 'squash',
+          })
+        },
       })
-      return aggregateCheckRuns(data.check_runs)
     },
   }
 }
