@@ -6,6 +6,7 @@ node_modules/
 dist/
 *.sqlite
 *.sqlite3
+*.db
 .vite/
 coverage/
 test-results/

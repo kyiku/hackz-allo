@@ -26,39 +26,28 @@ create_issue() {
 
 echo "==> デモIssueを作成: $REPO"
 
-create_issue "0除算でクラッシュする divide を安全にする" bug \
-"## 概要
-\`divide(a, b)\` が未実装で、0除算時の挙動も未定義。
+# デモはハッカソン向けに「hello world 級」の極小タスクにする。
+# 1〜2テストで通り、AIエージェントの戦闘が数十秒で終わる粒度にそろえる。
 
-## 期待
-- \`divide(6, 3) === 2\`
-- \`b === 0\` のとき例外を投げる（メッセージに 'division by zero' を含む）
-
-## 対象
-src/calculator.ts"
-
-create_issue "calculator を演算種別で拡張可能にリファクタする" refactor \
-"## 概要
-add/subtract が個別関数で重複気味。\`calculate(op, a, b)\` に集約したい。
-
-## 期待
-- \`calculate('add', 2, 3) === 5\`
-- \`calculate('sub', 5, 3) === 2\`
-- 未知の op で例外
+create_issue "greet(name) で挨拶を返す" bug \
+"## 期待
+- \`greet('Sora') === 'Hello, Sora!'\`
 
 ## 対象
-src/calculator.ts"
+src/greet.ts（新規）。テストは test/greet.test.ts。"
 
-create_issue "ユーザー入力の式評価でインジェクションを防ぐ" security \
-"## 概要
-文字列の式を評価する \`evalExpression\` が必要だが、eval は危険。
-
-## 期待
-- \`evalExpression('1 + 2') === 3\`
-- 数値と + - * / と空白のみ許可。それ以外（英字・括弧・セミコロン等）は例外
-- eval/Function を使わない安全な実装
+create_issue "double(n) が n の2倍を返す" refactor \
+"## 期待
+- \`double(4) === 8\`
 
 ## 対象
-src/expression.ts（新規）"
+src/calculator.ts に \`double\` を追加。"
+
+create_issue "shout(text) を大文字にする" security \
+"## 期待
+- \`shout('hi') === 'HI!'\`
+
+## 対象
+src/shout.ts（新規）。"
 
 echo "==> 完了"

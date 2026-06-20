@@ -1,8 +1,12 @@
 # GitHub Issue RPG
 
-AIによるTDD開発をRPGの戦闘体験にするWebツール。
+AIによるTDD開発をRPGの戦闘体験にするWebツール。Web版とiOSネイティブ（WebView）版を単一リポジトリに集約している。
 
-## 構成（pnpm モノレポ）
+## 構成
+
+`packages/*`（Webスタックの pnpm モノレポ）と `mobile/`（iOSネイティブ）に分かれる。
+
+### Web（`packages/*`）
 
 | パッケージ | 役割 |
 |---|---|
@@ -10,6 +14,23 @@ AIによるTDD開発をRPGの戦闘体験にするWebツール。
 | `packages/backend` | Express + WebSocket ハブ |
 | `packages/runner` | AIエージェント実行・GitHub連携・SQLite |
 | `packages/web` | React 18 + Vite + Phaser + Zustand + Tailwind |
+
+Web フロントは Cloudflare Pages にデプロイ（https://github-issue-rpg.pages.dev ）。
+WS接続先は同一オリジン `/ws` が既定だが、`?backend=wss://<URL>/ws`（または http(s) オリジン）で上書きでき、値は `localStorage` に保存される。
+
+### Mobile（`mobile/`）
+
+iOSネイティブアプリ（Swift / SwiftUI、XcodeGen でプロジェクト生成）。`mobile/TableBangConcentration/Web/` の `WKWebView` で上記デプロイ済みWebを全画面表示する。`.xcodeproj` は管理対象外で `project.yml` から生成する。
+
+```bash
+cd mobile
+xcodegen generate
+xcodebuild build -project TableBangConcentration.xcodeproj \
+  -scheme TableBangConcentration \
+  -destination 'platform=iOS Simulator,name=iPhone 17'
+```
+
+> ARゲーム（台パン神経衰弱）の画面は `mobile/TableBangConcentration/App/RootView` として温存しており、`TableBangApp.swift` の表示を差し替えれば復帰できる。詳細は `mobile/README.md`。
 
 ## 必要環境
 

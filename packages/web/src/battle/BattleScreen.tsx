@@ -11,6 +11,7 @@ import { battleStatusLabel, hpRatio, isBattleActive, logKindClass } from './pres
 export function BattleScreen({ battleId }: { battleId: string }) {
   const battle = useGameStore((s) => s.battles[battleId])
   const send = useGameStore((s) => s.send)
+  const dismissBattle = useGameStore((s) => s.dismissBattle)
   const [spell, setSpell] = useState('')
 
   const castSpell = useCallback(
@@ -35,14 +36,25 @@ export function BattleScreen({ battleId }: { battleId: string }) {
         <span className="font-pixel text-sm text-rpg-gold">
           {battle.battleId}・{battleStatusLabel(battle.status)}
         </span>
-        <button
-          type="button"
-          onClick={() => send({ type: 'cmd.stop', battleId })}
-          disabled={!active}
-          className="rpg-btn rpg-btn-danger px-3 py-1 text-xs"
-        >
-          緊急停止
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => send({ type: 'cmd.stop', battleId })}
+            disabled={!active}
+            className="rpg-btn rpg-btn-danger px-3 py-1 text-xs"
+          >
+            緊急停止
+          </button>
+          <button
+            type="button"
+            onClick={() => dismissBattle(battleId)}
+            aria-label="閉じる"
+            title="閉じる"
+            className="rpg-btn rpg-btn-ghost px-2 py-1 text-xs"
+          >
+            ✕
+          </button>
+        </div>
       </header>
 
       <div>

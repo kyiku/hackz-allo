@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { registerClaimHandler, rewardCandidates, startRewardGame } from '../native/rewardBridge'
 import { BattleScreen } from '../battle/BattleScreen'
 import { BlacksmithPanel } from '../blacksmith/BlacksmithPanel'
 import { ConnectedRepoConnectPanel } from '../connect/RepoConnectPanel'
@@ -41,12 +42,55 @@ export function WorldScreen() {
 
   const [overlay, setOverlay] = useState<Overlay>(null)
   const [connectOpen, setConnectOpen] = useState(false)
+  // 「戦う」押下直後〜battle.started までの準備中表示（動いている安心感のため）。
+  const [pendingBattleIssue, setPendingBattleIssue] = useState<number | null>(null)
   const mapRef = useRef<MapControls>(null)
 
   const enemyList = Object.values(enemies)
   const battleList = Object.values(battles)
   const closeOverlay = () => setOverlay(null)
-  const modalOpen = overlay !== null || connectOpen
+  const modalOpen = overlay !== null || connectOpen || pendingBattleIssue !== null
+
+  // 「戦う」: 鍛冶屋依頼を送り、会話を閉じて準備中モーダルを出す。
+  const startFight = (issueNumber: number) => {
+    send({ type: 'cmd.forge', issueNumber })
+    setOverlay(null)
+    setPendingBattleIssue(issueNumber)
+  }
+
+  // 対象の戦闘が始まったら（battle.started 受信）準備中モーダルを閉じる。
+  useEffect(() => {
+    if (pendingBattleIssue === null) return
+    if (battleList.some((battle) => battle.enemyId === pendingBattleIssue)) {
+      setPendingBattleIssue(null)
+    }
+  }, [battleList, pendingBattleIssue])
+
+  // 念のための保険: battle.started が来ないまま 90 秒経ったら準備中表示を閉じる（固まり防止）。
+  useEffect(() => {
+    if (pendingBattleIssue === null) return
+    const timer = setTimeout(() => setPendingBattleIssue(null), 90000)
+    return () => clearTimeout(timer)
+  }, [pendingBattleIssue])
+
+  // ネイティブ（WKWebView）からの報酬確定を cmd.reward.claim へ橋渡しする。
+  const sendRef = useRef(send)
+  sendRef.current = send
+  useEffect(() => {
+    registerClaimHandler((abilityIds) => {
+      if (abilityIds.length > 0) sendRef.current({ type: 'cmd.reward.claim', abilityIds })
+    })
+  }, [])
+
+  // 敵を撃破したら（battle.defeated → status=defeated）、ネイティブのAR報酬ミニゲームを起動する。
+  const rewardedBattles = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    for (const battle of battleList) {
+      if (battle.status !== 'defeated' || rewardedBattles.current.has(battle.battleId)) continue
+      rewardedBattles.current.add(battle.battleId)
+      startRewardGame(rewardCandidates(battle.enemyId))
+    }
+  }, [battleList])
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-rpg-bg text-rpg-ink">
@@ -125,7 +169,7 @@ export function WorldScreen() {
             : `NPC会話 — #${overlay.issueNumber}`
           return (
             <Modal title={title} onClose={closeOverlay}>
-              <NpcEncounter enemyId={overlay.enemyId} onClose={closeOverlay} />
+              <NpcEncounter enemyId={overlay.enemyId} onClose={closeOverlay} onFight={startFight} />
             </Modal>
           )
         })()}
@@ -157,6 +201,20 @@ export function WorldScreen() {
       {connectOpen && (
         <Modal title="リポジトリ接続" onClose={() => setConnectOpen(false)}>
           <ConnectedRepoConnectPanel />
+        </Modal>
+      )}
+
+      {pendingBattleIssue !== null && (
+        <Modal title="戦闘準備中" onClose={() => setPendingBattleIssue(null)}>
+          <div className="flex flex-col items-center gap-3 py-4 text-center">
+            <span className="inline-block h-9 w-9 animate-spin rounded-full border-4 border-rpg-frame/40 border-t-rpg-gold" />
+            <p className="font-pixel text-rpg-gold">⚔️ 鍛冶屋に依頼しました（#{pendingBattleIssue}）</p>
+            <p className="text-sm text-rpg-muted">
+              AIが作業環境を準備しています…
+              <br />
+              まもなく戦闘が始まります（数十秒かかることがあります）。
+            </p>
+          </div>
         </Modal>
       )}
     </div>

@@ -19,3 +19,17 @@ export {
   type EnemyPlacement,
 } from './world-map.js'
 export { reconcileEnemies, type ExistingEnemy, type ReconcileResult } from './issue-reconciler.js'
+export {
+  fetchOpenIssues,
+  parseRepoUrl,
+  GithubFetchError,
+  type FetchedIssue,
+  type RepoRef,
+  type FetchLike,
+} from './github-issues.js'
+export {
+  generateWorldState,
+  type ConnectWorldDeps,
+  type WorldStateEvent,
+} from './connect-world.js'
+export { removedIssueNumbers } from './issue-poll.js'

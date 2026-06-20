@@ -20,5 +20,7 @@ export const clientEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('cmd.loadout.tune'), tuning: loadoutTuningSchema }),
   z.object({ type: z.literal('cmd.npc.talk'), enemyId: z.number().int() }),
   z.object({ type: z.literal('cmd.connect'), repoUrl: z.string().url() }),
+  // 報酬ミニゲーム（神経衰弱）で獲得した能力を装備として受け取る。
+  z.object({ type: z.literal('cmd.reward.claim'), abilityIds: z.array(z.string()) }),
 ])
 export type ClientEvent = z.infer<typeof clientEventSchema>

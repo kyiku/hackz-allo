@@ -98,11 +98,14 @@ export class MapScene extends Phaser.Scene {
     this.base = base
   }
 
-  /** 敵集合を差し替える。create前に呼ばれても保持し、create後は即再描画する。 */
+  /**
+   * 敵集合を差し替える。create前に呼ばれても保持し、create後は即再描画する。
+   * 撃破済み(defeated)・撤去(removed)はマップから取り除く（issue解決＝敵消滅）。
+   */
   setEnemies(enemies: Enemy[]): void {
-    this.enemies = enemies
+    this.enemies = enemies.filter((enemy) => enemy.status === 'active')
     this.placements = placeEnemies(
-      enemies.map((enemy) => ({ id: enemy.id, issueNumber: enemy.issueNumber })),
+      this.enemies.map((enemy) => ({ id: enemy.id, issueNumber: enemy.issueNumber })),
       { cols: GRID.cols, rows: GRID.rows, blocked: RESERVED_CELLS },
     )
     if (this.ready) this.drawEntities()

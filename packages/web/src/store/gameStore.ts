@@ -14,6 +14,8 @@ interface GameStore extends GameData {
   send: (event: ClientEvent) => void
   /** 送信関数を差し替える（接続/切断時に App が呼ぶ）。 */
   setSender: (send: (event: ClientEvent) => void) => void
+  /** 戦闘画面を表示から取り除く（クライアント側のみ。サーバー状態には影響しない）。 */
+  dismissBattle: (battleId: string) => void
 }
 
 const noopSender: (event: ClientEvent) => void = () => {
@@ -35,4 +37,12 @@ export const useGameStore = create<GameStore>((set) => ({
   setConnection: (connection) => set({ connection }),
   send: noopSender,
   setSender: (send) => set({ send }),
+  dismissBattle: (battleId) =>
+    set((state) => {
+      // 該当battleを除いた新しい辞書を作る（不変・他は保持）。
+      const battles = Object.fromEntries(
+        Object.entries(state.battles).filter(([id]) => id !== battleId),
+      )
+      return { battles }
+    }),
 }))
