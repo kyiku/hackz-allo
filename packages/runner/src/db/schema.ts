@@ -134,7 +134,9 @@ CREATE TABLE IF NOT EXISTS loadouts (
 
 CREATE TABLE IF NOT EXISTS work_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  battle_id TEXT REFERENCES battles(id),
+  -- 作業ログは append-only の運用データ。戦闘ライフサイクル前後にも書かれ得るため
+  -- battles への外部キー制約は課さない（ソフト参照）。
+  battle_id TEXT,
   line TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
