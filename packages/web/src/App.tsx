@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { AssetGallery } from './assets/AssetGallery'
 import { BattleScreen } from './battle/BattleScreen'
 import { BlacksmithPanel } from './blacksmith/BlacksmithPanel'
+import { ConnectedRepoConnectPanel } from './connect/RepoConnectPanel'
 import { MapView } from './map/MapView'
 import { ConnectedStatusScreen } from './status/StatusScreen'
 import { useGameStore, type ConnectionStatus } from './store/gameStore'
@@ -60,14 +61,17 @@ export function App() {
       </header>
 
       <section>
-        <h2 className="mb-2 text-lg font-semibold text-slate-200">ワールド</h2>
-        {world ? (
-          <p className="mb-3 text-slate-300">
+        <h2 className="mb-2 text-lg font-semibold text-slate-200">リポジトリ接続</h2>
+        {world && (
+          <p className="mb-2 text-slate-300">
             {world.repoOwner}/{world.repoName}
           </p>
-        ) : (
-          <p className="mb-3 text-slate-500">未接続（リポジトリ接続UIはタスク10.8で実装する）。</p>
         )}
+        <ConnectedRepoConnectPanel />
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold text-slate-200">ワールド</h2>
         <MapView
           enemies={enemyList}
           onEngage={(issueNumber) => send({ type: 'cmd.forge', issueNumber })}

@@ -131,6 +131,13 @@ describe('applyServerEvent', () => {
     expect(state.tavernDraft).toEqual(draft)
   })
 
+  it('connect.error を保持し、world.state 到達で解消する', () => {
+    const errored = apply([{ type: 'connect.error', reason: 'auth', message: '認証に失敗' }])
+    expect(errored.connectError).toEqual({ reason: 'auth', message: '認証に失敗' })
+    const recovered = apply([{ type: 'world.state', world, enemies: [enemy] }], errored)
+    expect(recovered.connectError).toBeNull()
+  })
+
   it('元の状態を破壊しない（イミュータブル）', () => {
     const before = apply([{ type: 'enemy.appeared', enemy }])
     apply([{ type: 'enemy.removed', enemyId: 10 }], before)

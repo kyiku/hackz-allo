@@ -8,6 +8,10 @@ export const repoRefSchema = z.object({
 })
 export type RepoRef = z.infer<typeof repoRefSchema>
 
+/** リポジトリ接続エラーの種別（5.1 認証/権限エラー通知）。 */
+export const connectErrorReasonSchema = z.enum(['auth', 'permission', 'notfound', 'unknown'])
+export type ConnectErrorReason = z.infer<typeof connectErrorReasonSchema>
+
 /** 1 リポジトリ = 1 ワールド。 */
 export const worldSchema = z.object({
   id: z.number().int(),
