@@ -10,6 +10,7 @@ function handlers() {
     onTavernPublish: vi.fn(async () => {}),
     onLoadoutEquip: vi.fn(async () => {}),
     onLoadoutTune: vi.fn(async () => {}),
+    onNpcTalk: vi.fn(async () => {}),
     onConnect: vi.fn(async () => {}),
   }
 }
@@ -56,6 +57,12 @@ describe('createJobDispatcher', () => {
     await d.dispatch({ type: 'cmd.loadout.tune', tuning: { effort: 'high', partySize: 2 } })
     expect(h.onLoadoutEquip).toHaveBeenCalledWith(3, true)
     expect(h.onLoadoutTune).toHaveBeenCalledWith({ effort: 'high', partySize: 2 })
+  })
+
+  it('cmd.npc.talk を onNpcTalk に振り分ける', async () => {
+    const h = handlers()
+    await createJobDispatcher(h).dispatch({ type: 'cmd.npc.talk', enemyId: 10 })
+    expect(h.onNpcTalk).toHaveBeenCalledWith(10)
   })
 
   it('未知のイベントは例外', async () => {

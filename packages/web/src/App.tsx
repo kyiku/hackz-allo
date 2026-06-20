@@ -4,6 +4,7 @@ import { BattleScreen } from './battle/BattleScreen'
 import { BlacksmithPanel } from './blacksmith/BlacksmithPanel'
 import { ConnectedRepoConnectPanel } from './connect/RepoConnectPanel'
 import { MapView } from './map/MapView'
+import { ConnectedNpcDialoguePanel } from './npc/NpcDialoguePanel'
 import { ConnectedStatusScreen } from './status/StatusScreen'
 import { useGameStore, type ConnectionStatus } from './store/gameStore'
 import { ConnectedTavernPanel } from './tavern/TavernPanel'
@@ -93,6 +94,11 @@ export function App() {
           <AssetGallery />
         </section>
       )}
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold text-slate-200">NPC会話</h2>
+        <ConnectedNpcDialoguePanel />
+      </section>
 
       <section>
         <h2 className="mb-2 text-lg font-semibold text-slate-200">

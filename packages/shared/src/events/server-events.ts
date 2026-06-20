@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { assignmentSchema, battleLogKindSchema } from '../domain/battle.js'
 import { enemySchema } from '../domain/enemy.js'
 import { equipmentSchema, loadoutSchema, playerSchema } from '../domain/player.js'
+import { npcDialogueSchema } from '../domain/npc.js'
 import { rewardSchema } from '../domain/reward.js'
 import { issueDraftSchema } from '../domain/tavern.js'
 import { connectErrorReasonSchema, worldSchema } from '../domain/world.js'
@@ -50,6 +51,11 @@ export const serverEventSchema = z.discriminatedUnion('type', [
     type: z.literal('connect.error'),
     reason: connectErrorReasonSchema,
     message: z.string(),
+  }),
+  z.object({
+    type: z.literal('npc.dialogue'),
+    enemyId: z.number().int(),
+    dialogue: npcDialogueSchema,
   }),
 ])
 export type ServerEvent = z.infer<typeof serverEventSchema>

@@ -138,6 +138,40 @@ describe('applyServerEvent', () => {
     expect(recovered.connectError).toBeNull()
   })
 
+  it('npc.dialogue を enemyId ごとに保持する', () => {
+    const dialogue = {
+      summary: 'ログインが遅い',
+      difficultyNote: 'N+1クエリ',
+      files: ['src/auth.ts'],
+      winCondition: '応答が200ms以内',
+    }
+    const state = apply([{ type: 'npc.dialogue', enemyId: 10, dialogue }])
+    expect(state.npcDialogues[10]).toEqual(dialogue)
+  })
+
+  const dialogue = {
+    summary: 'x',
+    difficultyNote: 'y',
+    files: ['a.ts'],
+    winCondition: 'z',
+  }
+
+  it('enemy.removed で対応するNPC会話キャッシュも破棄する', () => {
+    const state = apply([
+      { type: 'npc.dialogue', enemyId: 10, dialogue },
+      { type: 'enemy.removed', enemyId: 10 },
+    ])
+    expect(state.npcDialogues[10]).toBeUndefined()
+  })
+
+  it('world.state でNPC会話キャッシュをリセットする', () => {
+    const state = apply([
+      { type: 'npc.dialogue', enemyId: 10, dialogue },
+      { type: 'world.state', world, enemies: [enemy] },
+    ])
+    expect(state.npcDialogues).toEqual({})
+  })
+
   it('元の状態を破壊しない（イミュータブル）', () => {
     const before = apply([{ type: 'enemy.appeared', enemy }])
     apply([{ type: 'enemy.removed', enemyId: 10 }], before)

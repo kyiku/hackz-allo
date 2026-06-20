@@ -7,6 +7,7 @@ import type {
   Equipment,
   IssueDraft,
   Loadout,
+  NpcDialogue,
   Player,
   Reward,
   ServerEvent,
@@ -56,6 +57,8 @@ export interface GameData {
   tavernDraft: IssueDraft | null
   /** 直近のリポジトリ接続エラー（成功時/未試行は null）。 */
   connectError: ConnectError | null
+  /** 敵(enemyId)ごとのNPC会話。話しかけて取得したものをキャッシュする。 */
+  npcDialogues: Record<number, NpcDialogue>
 }
 
 export const initialGameData: GameData = {
@@ -68,6 +71,7 @@ export const initialGameData: GameData = {
   assignments: [],
   tavernDraft: null,
   connectError: null,
+  npcDialogues: {},
 }
 
 /**
@@ -78,11 +82,13 @@ export function applyServerEvent(state: GameData, event: ServerEvent): GameData 
   switch (event.type) {
     case 'world.state':
       // 接続成功でワールドが届いたら直近の接続エラーを解消する。
+      // ワールド総入れ替え時は、前ワールドのNPC会話キャッシュも破棄する。
       return {
         ...state,
         world: event.world,
         enemies: Object.fromEntries(event.enemies.map((enemy) => [enemy.id, enemy])),
         connectError: null,
+        npcDialogues: {},
       }
 
     case 'enemy.appeared':
@@ -90,10 +96,14 @@ export function applyServerEvent(state: GameData, event: ServerEvent): GameData 
 
     case 'enemy.removed': {
       // ミューテーション(delete)を避け、対象キーを除いた新オブジェクトを生成する。
+      // 敵が消えたら対応するNPC会話キャッシュも一緒に破棄する（enemyId再利用での誤表示防止）。
       const enemies = Object.fromEntries(
         Object.entries(state.enemies).filter(([id]) => Number(id) !== event.enemyId),
       )
-      return { ...state, enemies }
+      const npcDialogues = Object.fromEntries(
+        Object.entries(state.npcDialogues).filter(([id]) => Number(id) !== event.enemyId),
+      )
+      return { ...state, enemies, npcDialogues }
     }
 
     case 'battle.started':
@@ -190,6 +200,12 @@ export function applyServerEvent(state: GameData, event: ServerEvent): GameData 
 
     case 'connect.error':
       return { ...state, connectError: { reason: event.reason, message: event.message } }
+
+    case 'npc.dialogue':
+      return {
+        ...state,
+        npcDialogues: { ...state.npcDialogues, [event.enemyId]: event.dialogue },
+      }
 
     default: {
       // 全 ServerEvent を網羅していることをコンパイル時に保証する。
