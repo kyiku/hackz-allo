@@ -93,6 +93,10 @@ export function ConnectScreen({ onBack }: ConnectScreenProps) {
               <kbd className="rpg-panel px-1.5 py-0.5 font-pixel text-xs">Enter</kbd>
               で話しかける
             </li>
+            <li className="text-rpg-muted lg:hidden">
+              スマホはマップを<span className="text-rpg-ink">スワイプ（フリック）</span>で移動・
+              <span className="text-rpg-ink">「決定」</span>ボタンで話しかける（横向き推奨）。
+            </li>
           </ul>
         </div>
 

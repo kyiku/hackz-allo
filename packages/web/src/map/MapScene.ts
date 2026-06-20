@@ -136,23 +136,29 @@ export class MapScene extends Phaser.Scene {
   }
 
   private onKey(event: KeyboardEvent): void {
-    if (!this.inputEnabled) return
     if (INTERACT_KEYS.has(event.key)) {
       this.interact()
       return
     }
     const dir = KEY_TO_DIR[event.key]
-    if (!dir) return
+    if (dir) this.move(dir)
+  }
+
+  /**
+   * 1マス移動する（キーボード／画面パッド共通の入口）。
+   * 進めなくても向きだけ更新して再描画する。モーダル中などは無効。
+   */
+  move(dir: Direction): void {
+    if (!this.inputEnabled) return
     this.facing = dir
     const blocked = blockedCells(this.placements)
-    const target = step(this.player, dir, GRID, blocked)
-    // 進めても向きだけ変えても、プレイヤー表示を更新する。
-    this.player = target
+    this.player = step(this.player, dir, GRID, blocked)
     this.drawEntities()
   }
 
-  /** 向いている隣接セルのNPC（敵/鍛冶屋/酒場/賢者）を判定し、インタラクトを発火する（決定キー）。 */
-  private interact(): void {
+  /** 向いている隣接セルのNPC（敵/鍛冶屋/酒場/賢者）を判定し、インタラクトを発火する（決定キー／決定ボタン）。 */
+  interact(): void {
+    if (!this.inputEnabled) return
     const front = neighborCell(this.player, this.facing, GRID)
     if (!front) return
     const enemyId = enemyAtCell(front, this.placements)

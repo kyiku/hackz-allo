@@ -1,15 +1,16 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { BattleScreen } from '../battle/BattleScreen'
 import { BlacksmithPanel } from '../blacksmith/BlacksmithPanel'
 import { ConnectedRepoConnectPanel } from '../connect/RepoConnectPanel'
 import type { InteractTarget } from '../map/MapScene'
-import { MapView } from '../map/MapView'
+import { MapView, type MapControls } from '../map/MapView'
 import { enemyName } from '../npc/enemyName'
 import { NpcEncounter } from '../npc/NpcEncounter'
 import { ConnectedStatusScreen } from '../status/StatusScreen'
 import { useGameStore, type ConnectionStatus } from '../store/gameStore'
 import { ConnectedTavernPanel } from '../tavern/TavernPanel'
 import { InteriorScreen } from '../ui/InteriorScreen'
+import { TouchControls } from '../ui/TouchControls'
 import { Modal } from '../ui/Modal'
 
 const CONNECTION_LABEL: Record<ConnectionStatus, string> = {
@@ -40,6 +41,7 @@ export function WorldScreen() {
 
   const [overlay, setOverlay] = useState<Overlay>(null)
   const [connectOpen, setConnectOpen] = useState(false)
+  const mapRef = useRef<MapControls>(null)
 
   const enemyList = Object.values(enemies)
   const battleList = Object.values(battles)
@@ -51,10 +53,28 @@ export function WorldScreen() {
       {/* フルスクリーンマップ（主役） */}
       <div className="absolute inset-0">
         <MapView
+          ref={mapRef}
           enemies={enemyList}
           onInteract={(target) => setOverlay(target)}
           paused={modalOpen}
         />
+      </div>
+
+      {/* モバイル向け画面コントロール（小画面のみ・モーダル中は隠す） */}
+      {!modalOpen && (
+        <TouchControls
+          onMove={(dir) => mapRef.current?.move(dir)}
+          onAction={() => mapRef.current?.interact()}
+        />
+      )}
+
+      {/* 縦持ちスマホには横向き推奨を案内（マップは横長のため） */}
+      <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-rpg-bg p-6 text-center landscape:hidden lg:hidden">
+        <span className="text-5xl" aria-hidden>
+          📱↻
+        </span>
+        <p className="font-pixel text-lg text-rpg-gold">横向きにしてください</p>
+        <p className="text-sm text-rpg-muted">マップは横画面でより快適に遊べます</p>
       </div>
 
       {/* ビネット（周辺減光）で奥行きと没入感を出す */}
@@ -72,8 +92,8 @@ export function WorldScreen() {
         className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-rpg-bg/70 to-transparent"
       />
 
-      {/* 上部HUD：接続状態・リポジトリ */}
-      <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-3">
+      {/* 上部HUD：接続状態・リポジトリ（スワイプ面より前面でタップ可能に） */}
+      <div className="pointer-events-none absolute left-3 top-3 z-40 flex items-center gap-3">
         <span className="rpg-window pointer-events-auto flex items-center gap-2 px-3 py-1.5 font-pixel text-sm text-rpg-ink">
           <span className={`h-2.5 w-2.5 rounded-full ${CONNECTION_COLOR[connection]}`} />
           {CONNECTION_LABEL[connection]}
