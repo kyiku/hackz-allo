@@ -2,6 +2,7 @@ import type {
   Assignment,
   BattleLogKind,
   BattleStatus,
+  ConnectErrorReason,
   Enemy,
   IssueDraft,
   Loadout,
@@ -10,6 +11,12 @@ import type {
   ServerEvent,
   World,
 } from '@github-issue-rpg/shared'
+
+/** リポジトリ接続エラー（認証/権限など）。 */
+export interface ConnectError {
+  reason: ConnectErrorReason
+  message: string
+}
 
 /** 戦闘ログ1行（演出の色分け用に kind を保持）。 */
 export interface BattleLogLine {
@@ -44,6 +51,8 @@ export interface GameData {
   assignments: Assignment[]
   /** 酒場で生成中の issue 案（未生成は null）。 */
   tavernDraft: IssueDraft | null
+  /** 直近のリポジトリ接続エラー（成功時/未試行は null）。 */
+  connectError: ConnectError | null
 }
 
 export const initialGameData: GameData = {
@@ -54,6 +63,7 @@ export const initialGameData: GameData = {
   loadout: null,
   assignments: [],
   tavernDraft: null,
+  connectError: null,
 }
 
 /**
@@ -63,10 +73,12 @@ export const initialGameData: GameData = {
 export function applyServerEvent(state: GameData, event: ServerEvent): GameData {
   switch (event.type) {
     case 'world.state':
+      // 接続成功でワールドが届いたら直近の接続エラーを解消する。
       return {
         ...state,
         world: event.world,
         enemies: Object.fromEntries(event.enemies.map((enemy) => [enemy.id, enemy])),
+        connectError: null,
       }
 
     case 'enemy.appeared':
@@ -164,6 +176,9 @@ export function applyServerEvent(state: GameData, event: ServerEvent): GameData 
 
     case 'world.assignments':
       return { ...state, assignments: event.assignments }
+
+    case 'connect.error':
+      return { ...state, connectError: { reason: event.reason, message: event.message } }
 
     default: {
       // 全 ServerEvent を網羅していることをコンパイル時に保証する。

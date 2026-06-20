@@ -4,7 +4,7 @@ import { enemySchema } from '../domain/enemy.js'
 import { loadoutSchema, playerSchema } from '../domain/player.js'
 import { rewardSchema } from '../domain/reward.js'
 import { issueDraftSchema } from '../domain/tavern.js'
-import { worldSchema } from '../domain/world.js'
+import { connectErrorReasonSchema, worldSchema } from '../domain/world.js'
 
 /**
  * サーバー→クライアント(S→C)のWSイベント。
@@ -41,5 +41,10 @@ export const serverEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('tavern.issueDraft'), draft: issueDraftSchema }),
   z.object({ type: z.literal('player.status'), player: playerSchema, loadout: loadoutSchema }),
   z.object({ type: z.literal('world.assignments'), assignments: z.array(assignmentSchema) }),
+  z.object({
+    type: z.literal('connect.error'),
+    reason: connectErrorReasonSchema,
+    message: z.string(),
+  }),
 ])
 export type ServerEvent = z.infer<typeof serverEventSchema>

@@ -52,6 +52,17 @@ describe('parseServerEvent', () => {
     }
     expect(() => parseServerEvent(event)).toThrow()
   })
+
+  it('connect.error をパースする', () => {
+    const event = { type: 'connect.error', reason: 'auth', message: '認証に失敗しました' }
+    expect(parseServerEvent(event)).toEqual(event)
+  })
+
+  it('connect.error の未知 reason を拒否する', () => {
+    expect(() =>
+      parseServerEvent({ type: 'connect.error', reason: 'bogus', message: 'x' }),
+    ).toThrow()
+  })
 })
 
 describe('parseClientEvent', () => {
