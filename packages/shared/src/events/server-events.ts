@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { assignmentSchema, battleLogKindSchema } from '../domain/battle.js'
 import { enemySchema } from '../domain/enemy.js'
-import { loadoutSchema, playerSchema } from '../domain/player.js'
+import { equipmentSchema, loadoutSchema, playerSchema } from '../domain/player.js'
 import { rewardSchema } from '../domain/reward.js'
 import { issueDraftSchema } from '../domain/tavern.js'
 import { worldSchema } from '../domain/world.js'
@@ -39,7 +39,12 @@ export const serverEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('battle.failed'), battleId: z.string(), reason: z.string() }),
   z.object({ type: z.literal('tavern.issueDraft'), draft: issueDraftSchema }),
-  z.object({ type: z.literal('player.status'), player: playerSchema, loadout: loadoutSchema }),
+  z.object({
+    type: z.literal('player.status'),
+    player: playerSchema,
+    loadout: loadoutSchema,
+    equipment: z.array(equipmentSchema),
+  }),
   z.object({ type: z.literal('world.assignments'), assignments: z.array(assignmentSchema) }),
 ])
 export type ServerEvent = z.infer<typeof serverEventSchema>

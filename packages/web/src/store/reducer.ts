@@ -3,6 +3,7 @@ import type {
   BattleLogKind,
   BattleStatus,
   Enemy,
+  Equipment,
   IssueDraft,
   Loadout,
   Player,
@@ -41,6 +42,8 @@ export interface GameData {
   battles: Record<string, BattleView>
   player: Player | null
   loadout: Loadout | null
+  /** 所有している装備コレクション（player.status で配信）。 */
+  equipment: Equipment[]
   assignments: Assignment[]
   /** 酒場で生成中の issue 案（未生成は null）。 */
   tavernDraft: IssueDraft | null
@@ -52,6 +55,7 @@ export const initialGameData: GameData = {
   battles: {},
   player: null,
   loadout: null,
+  equipment: [],
   assignments: [],
   tavernDraft: null,
 }
@@ -73,8 +77,10 @@ export function applyServerEvent(state: GameData, event: ServerEvent): GameData 
       return { ...state, enemies: { ...state.enemies, [event.enemy.id]: event.enemy } }
 
     case 'enemy.removed': {
-      const enemies = { ...state.enemies }
-      delete enemies[event.enemyId]
+      // ミューテーション(delete)を避け、対象キーを除いた新オブジェクトを生成する。
+      const enemies = Object.fromEntries(
+        Object.entries(state.enemies).filter(([id]) => Number(id) !== event.enemyId),
+      )
       return { ...state, enemies }
     }
 
@@ -160,7 +166,12 @@ export function applyServerEvent(state: GameData, event: ServerEvent): GameData 
       return { ...state, tavernDraft: event.draft }
 
     case 'player.status':
-      return { ...state, player: event.player, loadout: event.loadout }
+      return {
+        ...state,
+        player: event.player,
+        loadout: event.loadout,
+        equipment: event.equipment,
+      }
 
     case 'world.assignments':
       return { ...state, assignments: event.assignments }
