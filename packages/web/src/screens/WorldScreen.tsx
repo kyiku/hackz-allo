@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { BattleScreen } from '../battle/BattleScreen'
+import { useEffect, useRef, useState } from 'react'
+import { BattleView } from '../battle/BattleView'
 import { BlacksmithPanel } from '../blacksmith/BlacksmithPanel'
 import { ConnectedRepoConnectPanel } from '../connect/RepoConnectPanel'
 import type { InteractTarget } from '../map/MapScene'
@@ -9,7 +9,10 @@ import { NpcEncounter } from '../npc/NpcEncounter'
 import { ConnectedStatusScreen } from '../status/StatusScreen'
 import { useGameStore, type ConnectionStatus } from '../store/gameStore'
 import { ConnectedTavernPanel } from '../tavern/TavernPanel'
+import { sound } from '../audio/sound'
 import { InteriorScreen } from '../ui/InteriorScreen'
+import { MuteButton } from '../ui/MuteButton'
+import { PlayerHud } from '../ui/PlayerHud'
 import { TouchControls } from '../ui/TouchControls'
 import { Modal } from '../ui/Modal'
 
@@ -41,12 +44,52 @@ export function WorldScreen() {
 
   const [overlay, setOverlay] = useState<Overlay>(null)
   const [connectOpen, setConnectOpen] = useState(false)
+  const [battleViewOpen, setBattleViewOpen] = useState(true)
+  const [hintOpen, setHintOpen] = useState(() => {
+    try {
+      return localStorage.getItem('girpg.worldHintSeen') !== '1'
+    } catch {
+      return true
+    }
+  })
   const mapRef = useRef<MapControls>(null)
+
+  const dismissHint = () => {
+    setHintOpen(false)
+    try {
+      localStorage.setItem('girpg.worldHintSeen', '1')
+    } catch {
+      // localStorage 不可（プライベートブラウズ等）でも致命ではない。
+    }
+  }
 
   const enemyList = Object.values(enemies)
   const battleList = Object.values(battles)
-  const closeOverlay = () => setOverlay(null)
-  const modalOpen = overlay !== null || connectOpen
+  const battleIds = battleList.map((b) => b.battleId)
+  const closeOverlay = () => {
+    setOverlay(null)
+    sound.playSfx('close')
+  }
+
+  // 新しい戦闘が始まったら全画面バトルビューを自動で開く＋開始SE。
+  const prevBattleCount = useRef(0)
+  useEffect(() => {
+    if (battleList.length > prevBattleCount.current) {
+      setBattleViewOpen(true)
+      sound.playSfx('battle')
+    }
+    prevBattleCount.current = battleList.length
+  }, [battleList.length])
+
+  const battleViewShown = battleList.length > 0 && battleViewOpen
+  const modalOpen = overlay !== null || connectOpen || battleViewShown
+
+  // BGM: 歩き中は壮大なオーケストラ(field)、戦闘中は勇ましいオーケストラ(battle)に切り替える。
+  useEffect(() => {
+    sound.startBgm(battleViewShown ? 'battle.m4a' : 'field.mp3')
+  }, [battleViewShown])
+  // ワールドを離れたら停止。
+  useEffect(() => () => sound.stopBgm(), [])
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-rpg-bg text-rpg-ink">
@@ -55,7 +98,10 @@ export function WorldScreen() {
         <MapView
           ref={mapRef}
           enemies={enemyList}
-          onInteract={(target) => setOverlay(target)}
+          onInteract={(target) => {
+            sound.playSfx('open')
+            setOverlay(target)
+          }}
           paused={modalOpen}
         />
       </div>
@@ -92,27 +138,58 @@ export function WorldScreen() {
         className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-rpg-bg/70 to-transparent"
       />
 
-      {/* 上部HUD：接続状態・リポジトリ（スワイプ面より前面でタップ可能に） */}
-      <div className="pointer-events-none absolute left-3 top-3 z-40 flex items-center gap-3">
-        <span className="rpg-window pointer-events-auto flex items-center gap-2 px-3 py-1.5 font-pixel text-sm text-rpg-ink">
-          <span className={`h-2.5 w-2.5 rounded-full ${CONNECTION_COLOR[connection]}`} />
-          {CONNECTION_LABEL[connection]}
-        </span>
-        <button
-          type="button"
-          onClick={() => setConnectOpen(true)}
-          className="rpg-window pointer-events-auto px-3 py-1.5 font-pixel text-sm text-rpg-ink hover:text-rpg-gold"
-        >
-          {world ? `${world.repoOwner}/${world.repoName}` : 'リポジトリ接続'}
-        </button>
+      {/* 上部HUD：接続/リポジトリ＋プレイヤー状態（スワイプ面より前面でタップ可能に） */}
+      <div className="pointer-events-none absolute left-3 top-3 z-40 flex flex-col items-start gap-2">
+        <div className="flex items-center gap-3">
+          <span className="rpg-window pointer-events-auto flex items-center gap-2 px-3 py-1.5 font-pixel text-sm text-rpg-ink">
+            <span className={`h-2.5 w-2.5 rounded-full ${CONNECTION_COLOR[connection]}`} />
+            {CONNECTION_LABEL[connection]}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              sound.playSfx('open')
+              setConnectOpen(true)
+            }}
+            className="rpg-window pointer-events-auto px-3 py-1.5 font-pixel text-sm text-rpg-ink hover:text-rpg-gold"
+          >
+            {world ? `${world.repoOwner}/${world.repoName}` : 'リポジトリ接続'}
+          </button>
+        </div>
+        <PlayerHud />
       </div>
 
-      {/* 戦闘は進行中だけサイドパネルで表示（マップを隠さない） */}
-      {battleList.length > 0 && (
-        <div className="absolute right-3 top-14 z-40 flex max-h-[80vh] w-96 max-w-[90vw] flex-col gap-3 overflow-y-auto">
-          {battleList.map((battle) => (
-            <BattleScreen key={battle.battleId} battleId={battle.battleId} />
-          ))}
+      {/* 右上：ミュート＋（戦闘を閉じている時）戦闘再開バッジ */}
+      <div className="pointer-events-none absolute right-3 top-3 z-40 flex items-center gap-2">
+        {battleList.length > 0 && !battleViewOpen && (
+          <button
+            type="button"
+            onClick={() => setBattleViewOpen(true)}
+            className="rpg-window pointer-events-auto px-3 py-1.5 font-pixel text-sm text-rpg-gold hover:brightness-110"
+          >
+            ⚔ 戦闘 {battleList.length}
+          </button>
+        )}
+        <MuteButton />
+      </div>
+
+      {/* 全画面バトルビュー（複数同時戦闘はタブ切替） */}
+      {battleViewShown && (
+        <BattleView battleIds={battleIds} onClose={() => setBattleViewOpen(false)} />
+      )}
+
+      {/* 初回オンボーディング（一度だけ・localStorage） */}
+      {hintOpen && !modalOpen && (
+        <div className="rpg-window pointer-events-auto absolute bottom-6 left-1/2 z-40 w-[min(92vw,30rem)] -translate-x-1/2 p-4">
+          <p className="rpg-label mb-2 text-sm">はじめての村</p>
+          <ul className="mb-3 flex flex-col gap-1 text-sm text-rpg-ink">
+            <li>・敵に隣接して話しかけ、「戦う」で戦闘を始めよう</li>
+            <li>・鍛冶屋／酒場／賢者の家で準備（依頼・相談・編成）</li>
+            <li>・移動は 矢印/WASD、スマホはスワイプ＋「決定」</li>
+          </ul>
+          <button type="button" onClick={dismissHint} className="rpg-btn rpg-btn-gold w-full">
+            はじめる
+          </button>
         </div>
       )}
 
@@ -155,7 +232,13 @@ export function WorldScreen() {
       )}
 
       {connectOpen && (
-        <Modal title="リポジトリ接続" onClose={() => setConnectOpen(false)}>
+        <Modal
+          title="リポジトリ接続"
+          onClose={() => {
+            setConnectOpen(false)
+            sound.playSfx('close')
+          }}
+        >
           <ConnectedRepoConnectPanel />
         </Modal>
       )}

@@ -61,6 +61,14 @@ const SPRITE_KEYS: AssetKey[] = ['player', 'enemy-easy', 'enemy-normal', 'enemy-
 /** 背景タイルシート（Kenney RPG Pack, 64px）のテクスチャキー。 */
 const TILES_KEY: AssetKey = 'tiles'
 
+/** 敵の難易度→脅威度を示すリング色。 */
+const DIFFICULTY_COLOR: Record<Enemy['difficulty'], number> = {
+  easy: 0x4ade80,
+  normal: 0x38bdf8,
+  hard: 0xa78bfa,
+  boss: 0xf4d06a,
+}
+
 /**
  * RPG風マップのPhaserシーン（タスク#117）。
  * 草地ベースに川/橋・土の道・木立・木造の家・小物をタイルで描画し、矢印/WASDで歩行移動。
@@ -199,6 +207,42 @@ export class MapScene extends Phaser.Scene {
     this.drawTerrain()
     this.drawObjects()
     for (const house of HOUSES) this.drawHouse(house)
+    this.drawWaterSparkles()
+  }
+
+  /** 水面に小さなきらめきを散らして川を生き生きさせる（reduced-motion時は描かない）。 */
+  private drawWaterSparkles(): void {
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (reduce) return
+    let n = 0
+    for (let y = 0; y < GRID.rows; y++) {
+      for (let x = 0; x < GRID.cols; x++) {
+        if (terrainAt(x, y) !== 'water') continue
+        n++
+        if (n % 3 !== 0) continue // 1/3 のセルだけに置いて軽量に保つ。
+        const { cx, cy } = this.cellCenter({ x, y })
+        const ox = ((n * 53) % 20) - 10
+        const oy = ((n * 31) % 16) - 8
+        const sparkle = this.add.ellipse(
+          cx + ox,
+          cy + oy,
+          GRID.tile * 0.2,
+          GRID.tile * 0.1,
+          0xffffff,
+          0,
+        )
+        this.staticLayer?.add(sparkle)
+        this.tweens.add({
+          targets: sparkle,
+          alpha: { from: 0, to: 0.55 },
+          duration: 1100,
+          delay: (n * 137) % 2200,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.inOut',
+        })
+      }
+    }
   }
 
   /** タイル1枚を静的レイヤーへ描く（隙間防止に +1）。 */
@@ -428,13 +472,47 @@ export class MapScene extends Phaser.Scene {
 
   private drawEnemy(enemy: Enemy, cell: Cell, index: number): void {
     this.addShadow(this.entityLayer, cell, 0.5, 0.34)
+    const defeated = enemy.status === 'defeated'
+    // 難易度色のリング（足元）で脅威度を一目で示す。撃破済みは描かない。
+    if (!defeated) this.drawDifficultyRing(cell, enemy.difficulty)
     const image = this.drawEntitySprite(cell, enemyAssetKey(enemy.difficulty), GRID.tile - 4)
     if (!image) return
-    if (enemy.status === 'defeated') {
+    if (defeated) {
       image.setAlpha(0.35).setTint(0x94a3b8)
     } else {
       this.bob(image, (index % 4) * 200)
+      // 交戦中（HPが削れている）敵は頭上に小さなHPバー。
+      if (enemy.hpCurrent < enemy.hpTotal && enemy.hpTotal > 0) {
+        this.drawEnemyHp(cell, enemy.hpCurrent / enemy.hpTotal)
+      }
     }
+  }
+
+  /** 敵の足元に難易度色のリングを敷く。 */
+  private drawDifficultyRing(cell: Cell, difficulty: Enemy['difficulty']): void {
+    const color = DIFFICULTY_COLOR[difficulty]
+    const { cx, cy } = this.cellCenter(cell)
+    const cyBase = cy + GRID.tile * 0.3
+    // 外側のやわらかいグロー＋くっきりしたリングで脅威度を強調。
+    const glow = this.add.ellipse(cx, cyBase, GRID.tile * 0.92, GRID.tile * 0.42, color, 0.18)
+    const ring = this.add
+      .ellipse(cx, cyBase, GRID.tile * 0.78, GRID.tile * 0.34)
+      .setStrokeStyle(3, color, 1)
+      .setFillStyle(color, 0.22)
+    this.entityLayer?.add(glow)
+    this.entityLayer?.add(ring)
+  }
+
+  /** 敵の頭上にHPバー（割合）。 */
+  private drawEnemyHp(cell: Cell, ratio: number): void {
+    const { cx, cy } = this.cellCenter(cell)
+    const w = GRID.tile * 0.7
+    const y = cy - GRID.tile * 0.5
+    const bg = this.add.rectangle(cx, y, w, 5, 0x1b1b1b, 0.85).setStrokeStyle(1, 0x000000)
+    const fillW = Math.max(1, w * Math.min(1, Math.max(0, ratio)))
+    const fill = this.add.rectangle(cx - w / 2 + fillW / 2, y, fillW, 3, 0xef4444)
+    this.entityLayer?.add(bg)
+    this.entityLayer?.add(fill)
   }
 
   /** プレイヤーはキャラスプライト（Tiny Dungeonの勇者）＋向きを示す小ドット。 */
