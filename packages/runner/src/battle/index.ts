@@ -14,3 +14,10 @@ export {
   type StartForgeBattleDeps,
   type ForgeBattleHandle,
 } from './forge-battle.js'
+export {
+  buildBattleFailure,
+  prepareRetry,
+  recomputeTargetsForRetry,
+  type PreservedBattleState,
+  type RetryContext,
+} from './failure-retry.js'
