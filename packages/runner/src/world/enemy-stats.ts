@@ -67,15 +67,22 @@ export interface IssueSummary {
   labels: readonly string[]
 }
 
-/** Issueから必要テスト一覧をLLMで生成する。 */
+/**
+ * 必要テストの最大件数。デモ（ハッカソン）向けに戦闘を短く保つための上限。
+ * HP=必要テスト件数なので、これが敵HPの上限にもなる。
+ */
+export const MAX_REQUIRED_TESTS = 2
+
+/** Issueから必要テスト一覧をLLMで生成する（最大 {@link MAX_REQUIRED_TESTS} 件に制限）。 */
 export async function generateRequiredTests(
   generator: StructuredGenerator,
   issue: IssueSummary,
 ): Promise<string[]> {
   const result = await generator.generate(requiredTestsSchema, {
     system:
-      'あなたはTDDの専門家です。GitHub Issueを解決するために最低限必要なテストケースを列挙してください。',
+      `あなたはTDDの専門家です。GitHub Issueを解決するために最低限必要なテストケースを、最大${MAX_REQUIRED_TESTS}件だけ列挙してください。デモ用途なので、最重要なものに絞ること。`,
     prompt: `タイトル: ${issue.title}\nラベル: ${issue.labels.join(', ')}\n本文:\n${issue.body}`,
   })
-  return result.tests
+  // 念のためコード側でも上限を強制する（LLMが多く返しても切り詰める）。
+  return result.tests.slice(0, MAX_REQUIRED_TESTS)
 }
