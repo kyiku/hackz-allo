@@ -21,3 +21,4 @@ export {
   type CanUseTool,
   type ToolUseDecision,
 } from './command-restriction.js'
+export { messageToBattleLogs, type BattleLogLine } from './forge-events.js'
