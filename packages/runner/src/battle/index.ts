@@ -5,3 +5,4 @@ export {
   deriveStatusFromHp,
   type BattleEvent,
 } from './battle-state-machine.js'
+export { createHpTracker, type HpTracker, type RecordTestResult } from './hp-tracker.js'
