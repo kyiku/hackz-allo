@@ -21,3 +21,5 @@ export {
   type PreservedBattleState,
   type RetryContext,
 } from './failure-retry.js'
+export { runForgeBattle, type ForgeRunnerDeps, type ForgeRunnerParams } from './forge-runner.js'
+export { createNodeForgeBattle, type NodeForgeBattleDeps } from './forge-runner-node.js'

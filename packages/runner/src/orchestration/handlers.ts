@@ -1,12 +1,28 @@
-import type { LoadoutTuning } from '@github-issue-rpg/shared'
+import type { ConnectErrorReason, LoadoutTuning } from '@github-issue-rpg/shared'
 import type { StructuredGenerator } from '../ai/structured-generator.js'
 import type { EquipmentRepository } from '../db/repositories/equipment-repository.js'
 import type { LoadoutRepository } from '../db/repositories/loadout-repository.js'
 import type { PlayerRepository } from '../db/repositories/player-repository.js'
 import { buildPlayerStatusEvent } from '../loadout/projection.js'
 import { generateIssueProposal } from '../tavern/issue-proposal.js'
+import {
+  generateRequiredTests,
+  generateWorldState,
+  GithubFetchError,
+  type FetchedIssue,
+} from '../world/index.js'
 import type { BackendClient } from './backend-client.js'
 import type { JobHandlers } from './dispatcher.js'
+
+/** GitHub取得エラーのHTTPステータスを connect.error の reason へ分類する。 */
+function classifyConnectError(error: unknown): ConnectErrorReason {
+  if (error instanceof GithubFetchError) {
+    if (error.status === 401) return 'auth'
+    if (error.status === 403) return 'permission'
+    if (error.status === 404) return 'notfound'
+  }
+  return 'unknown'
+}
 
 /**
  * まだ実体に結線されていないジョブが呼ばれたことを示すエラー。
@@ -28,6 +44,12 @@ export interface JobContext {
   equipment: EquipmentRepository
   /** 構造化生成器（既定は Agent SDK = サブスク認証。酒場の issue 案生成等に使う）。 */
   generator: StructuredGenerator
+  /** open issue を取得する（repo接続＝ワールド生成に使う。PATは内部に閉じる）。 */
+  fetchIssues(owner: string, name: string): Promise<FetchedIssue[]>
+  /** 現在接続中リポジトリの可変状態（onConnect が設定、onForge が参照）。 */
+  session: { repoUrl: string | null }
+  /** cmd.forge の実体（clone→Claude→テスト→PR）。実依存は外側で注入する。 */
+  forgeBattle(issueNumber: number): Promise<void>
   /** 単一プレイヤー前提のデモにおける対象プレイヤーID。 */
   playerId: number
 }
@@ -60,7 +82,7 @@ export function createJobHandlers(ctx: JobContext): JobHandlers {
   }
 
   return {
-    onForge: notWired('cmd.forge'),
+    onForge: (issueNumber: number) => ctx.forgeBattle(issueNumber),
     onSpell: notWired('spell.cast'),
     onStop: notWired('cmd.stop'),
 
@@ -97,6 +119,29 @@ export function createJobHandlers(ctx: JobContext): JobHandlers {
     },
 
     onNpcTalk: notWired('cmd.npc.talk'),
-    onConnect: notWired('cmd.connect'),
+
+    async onConnect(repoUrl: string): Promise<void> {
+      // repoURL → open issue 取得 → 敵生成 → world.state 配信（要件5.2）。
+      // 取得失敗は偽の成功にせず connect.error として通知する（要件5.1）。
+      try {
+        const event = await generateWorldState(
+          {
+            fetchIssues: ctx.fetchIssues,
+            generateTests: (issue) => generateRequiredTests(ctx.generator, issue),
+            now: () => new Date().toISOString(),
+          },
+          repoUrl,
+        )
+        await ctx.backend.emit(event)
+        // 接続成功したリポジトリを記憶し、以降の cmd.forge の対象にする。
+        ctx.session.repoUrl = repoUrl
+      } catch (error) {
+        await ctx.backend.emit({
+          type: 'connect.error',
+          reason: classifyConnectError(error),
+          message: error instanceof Error ? error.message : 'リポジトリ接続に失敗しました',
+        })
+      }
+    },
   }
 }

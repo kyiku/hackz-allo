@@ -2,6 +2,7 @@ import type { Loadout } from '@github-issue-rpg/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { JobNotImplementedError, createJobHandlers, type JobContext } from './handlers'
 import { createJobDispatcher } from './dispatcher'
+import { GithubFetchError } from '../world/index.js'
 
 function inMemoryLoadouts(initial: Loadout = { equippedIds: [], partySize: 1 }) {
   let current = initial
@@ -36,6 +37,9 @@ function makeContext(loadout?: Loadout): {
       listByPlayer: vi.fn(() => []),
     },
     generator: { generate },
+    fetchIssues: vi.fn(async () => []),
+    session: { repoUrl: null },
+    forgeBattle: vi.fn(async () => {}),
     playerId: 1,
   }
   return { ctx, loadouts, generate }
@@ -105,7 +109,55 @@ describe('createJobHandlers - 未結線', () => {
   it('未結線アクションは JobNotImplementedError（種別を含む）を投げる', async () => {
     const { ctx } = makeContext()
     const handlers = createJobHandlers(ctx)
-    await expect(handlers.onForge(1)).rejects.toBeInstanceOf(JobNotImplementedError)
-    await expect(handlers.onConnect('https://github.com/k/r')).rejects.toThrow(/cmd\.connect/)
+    await expect(handlers.onNpcTalk(1)).rejects.toBeInstanceOf(JobNotImplementedError)
+    await expect(handlers.onStop('b1')).rejects.toBeInstanceOf(JobNotImplementedError)
+  })
+
+  it('onForge は ctx.forgeBattle に委譲する', async () => {
+    const { ctx } = makeContext()
+    await createJobHandlers(ctx).onForge(42)
+    expect(ctx.forgeBattle).toHaveBeenCalledWith(42)
+  })
+
+  it('onConnect 成功時は接続リポジトリを session に記憶する', async () => {
+    const { ctx, generate } = makeContext()
+    ctx.fetchIssues = vi.fn(async () => [{ number: 1, title: 't', body: '', labels: [] }])
+    generate.mockResolvedValue({ tests: ['a'] })
+    await createJobHandlers(ctx).onConnect('https://github.com/kyiku/hackz-allo-demo')
+    expect(ctx.session.repoUrl).toBe('https://github.com/kyiku/hackz-allo-demo')
+  })
+})
+
+describe('createJobHandlers - connect', () => {
+  it('onConnect は issue を取得して world.state を配信する', async () => {
+    const { ctx, generate } = makeContext()
+    ctx.fetchIssues = vi.fn(async () => [
+      { number: 1, title: '0除算を防ぐ', body: '...', labels: ['bug'] },
+    ])
+    generate.mockResolvedValue({ tests: ['t1', 't2'] })
+
+    await createJobHandlers(ctx).onConnect('https://github.com/kyiku/hackz-allo-demo')
+
+    expect(ctx.fetchIssues).toHaveBeenCalledWith('kyiku', 'hackz-allo-demo')
+    expect(ctx.backend.emit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'world.state',
+        world: expect.objectContaining({ repoOwner: 'kyiku', repoName: 'hackz-allo-demo' }),
+        enemies: expect.arrayContaining([expect.objectContaining({ issueNumber: 1 })]),
+      }),
+    )
+  })
+
+  it('取得失敗は connect.error として通知する（偽の成功にしない）', async () => {
+    const { ctx } = makeContext()
+    ctx.fetchIssues = vi.fn(async () => {
+      throw new GithubFetchError(404, 'not found')
+    })
+
+    await createJobHandlers(ctx).onConnect('https://github.com/k/r')
+
+    expect(ctx.backend.emit).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'connect.error', reason: 'notfound' }),
+    )
   })
 })
