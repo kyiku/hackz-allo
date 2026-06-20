@@ -8,6 +8,9 @@ import type { StructuredGenerator } from '../ai/index.js'
 import { runForgeWithSdk } from '../ai/index.js'
 import { createGitHubGateway, createOctokit } from '../github/index.js'
 import { buildPartyAgents } from '../reward/party.js'
+import { buildAbilityInjection } from '../reward/ability-injection.js'
+import { resolveAbilitySdkOptions } from '../reward/ability-sdk.js'
+import type { ForgeInjection } from '../ai/forge-agent.js'
 import { fetchOpenIssues, parseRepoUrl, generateRequiredTests } from '../world/index.js'
 import type { BackendClient } from '../orchestration/backend-client.js'
 import { runForgeBattle, type ForgeRunnerDeps } from './forge-runner.js'
@@ -93,6 +96,12 @@ export function createNodeForgeBattle(
   const octokit = createOctokit(config.githubPat)
   const gateway = createGitHubGateway({ octokit })
 
+  // 装備能力の「実注入」フラグ（プロセス=セッション単位）。未設定なら従来どおりプロンプト前置きのみ。
+  const abilityInjectionEnabled = process.env.FORGE_ABILITY_INJECTION === '1'
+  if (abilityInjectionEnabled) {
+    console.log('[runner] 装備能力の実注入(MCP/skill)を有効化しました (FORGE_ABILITY_INJECTION=1)')
+  }
+
   return async function forgeBattle(issueNumber: number): Promise<void> {
     const repoUrl = config.getRepoUrl()
     if (!repoUrl) {
@@ -112,6 +121,11 @@ export function createNodeForgeBattle(
     // 戦闘開始時点の装備をスナップショットし、プロンプト前置きと表示に使う。
     const loadout = config.getEquippedLoadout()
     const loadoutPrompt = buildLoadoutPrompt(loadout)
+
+    // フラグ有効時のみ、装備能力を query() の MCP/skill 設定へ実体注入する（戦闘ごとに解決）。
+    const injection: ForgeInjection | undefined = abilityInjectionEnabled
+      ? resolveAbilitySdkOptions(buildAbilityInjection(loadout.abilities.map((ability) => ability.id)))
+      : undefined
 
     const deps: ForgeRunnerDeps = {
       emit: (event) => config.backend.emit(event),
@@ -133,7 +147,7 @@ export function createNodeForgeBattle(
       },
 
       runAgent: ({ prompt, worktreePath }) =>
-        runForgeWithSdk({ prompt: `${loadoutPrompt}${prompt}`, worktreePath }),
+        runForgeWithSdk({ prompt: `${loadoutPrompt}${prompt}`, worktreePath, injection }),
 
       describeLoadout: () => describeLoadout(loadout),
 

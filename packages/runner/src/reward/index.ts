@@ -12,12 +12,12 @@ export {
   type PlayerProgress,
   type ExpGainResult,
 } from './leveling.js'
+export { buildAbilityInjection, type AbilityInjection } from './ability-injection.js'
 export {
-  buildAbilityInjection,
-  buildForgeOptionsWithAbilities,
-  type AbilityInjection,
-  type ForgeOptionsWithAbilities,
-} from './ability-injection.js'
+  resolveAbilitySdkOptions,
+  mcpRegistryFromEnv,
+  type AbilitySdkOptions,
+} from './ability-sdk.js'
 export {
   buildPartyAgents,
   delegationLogFromHook,
