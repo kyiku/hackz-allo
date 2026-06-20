@@ -24,14 +24,15 @@ final class WebBridge: NSObject, ObservableObject, WKScriptMessageHandler {
     }
 
     /// 指定URLを読み込む（既読込と同じなら何もしない）。
+    /// 常に最新のフロントを取得するためローカルキャッシュを無視する（デプロイ反映漏れ防止）。
     func load(_ url: URL) {
         guard url != currentURL else { return }
         currentURL = url
-        webView.load(URLRequest(url: url))
+        webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
     }
 
     func reload() {
-        webView.reload()
+        webView.reloadFromOrigin()
     }
 
     /// 獲得した強化能力IDを Web に渡す（Web 側が cmd.reward.claim を送る）。
