@@ -1,3 +1,4 @@
+import type { BattleLogKind } from '@github-issue-rpg/shared'
 import { describe, expect, it } from 'vitest'
 import { battleStatusLabel, hpRatio, isBattleActive, logKindClass } from './presentation'
 
@@ -20,9 +21,17 @@ describe('hpRatio', () => {
 })
 
 describe('logKindClass', () => {
-  it('種別ごとに異なる色クラスを返す', () => {
-    expect(logKindClass('attack')).not.toBe(logKindClass('heal'))
-    expect(logKindClass('spell')).toContain('text-')
+  const kinds: BattleLogKind[] = ['attack', 'heal', 'spell', 'system', 'info']
+
+  it('全種別が text- 色クラスを返す', () => {
+    for (const kind of kinds) {
+      expect(logKindClass(kind)).toMatch(/^text-/)
+    }
+  })
+
+  it('種別ごとに異なる色クラスを返す（重複なし）', () => {
+    const classes = kinds.map(logKindClass)
+    expect(new Set(classes).size).toBe(kinds.length)
   })
 })
 

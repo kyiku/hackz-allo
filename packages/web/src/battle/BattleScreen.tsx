@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { battleStatusLabel, hpRatio, isBattleActive, logKindClass } from './presentation'
 
@@ -13,18 +13,21 @@ export function BattleScreen({ battleId }: { battleId: string }) {
   const send = useGameStore((s) => s.send)
   const [spell, setSpell] = useState('')
 
+  const castSpell = useCallback(
+    (event: FormEvent) => {
+      event.preventDefault()
+      const message = spell.trim()
+      if (!message) return
+      send({ type: 'spell.cast', battleId, message })
+      setSpell('')
+    },
+    [spell, battleId, send],
+  )
+
   if (!battle) return null
 
   const active = isBattleActive(battle.status)
   const ratio = hpRatio(battle.hpCurrent, battle.hpTotal)
-
-  function castSpell(event: FormEvent) {
-    event.preventDefault()
-    const message = spell.trim()
-    if (!message) return
-    send({ type: 'spell.cast', battleId, message })
-    setSpell('')
-  }
 
   return (
     <article className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-800/60 p-4">
@@ -59,8 +62,8 @@ export function BattleScreen({ battleId }: { battleId: string }) {
       </div>
 
       <ul className="flex max-h-48 flex-col gap-0.5 overflow-y-auto rounded bg-slate-900/60 p-2 text-sm">
-        {battle.logs.map((log, index) => (
-          <li key={index} className={logKindClass(log.kind)}>
+        {battle.logs.map((log) => (
+          <li key={log.seq} className={logKindClass(log.kind)}>
             {log.line}
           </li>
         ))}
