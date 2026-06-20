@@ -1,46 +1,68 @@
 import SwiftUI
 import WebKit
 
-/// 指定URLを表示する `WKWebView` の SwiftUI ラッパー。
-/// Issue RPG など外部Webアプリを組み込むために用いる。WebSocket(wss) もネイティブに通る。
-/// URLが変わったとき、または `reloadToken` が進んだときに再読み込みする。
-struct WebView: UIViewRepresentable {
-    let url: URL
-    /// 画面側からのリロード要求トリガ（値が変わると reload）。
-    var reloadToken: Int = 0
+/// Web アプリ（Issue RPG）と双方向にやり取りするブリッジ。
+/// - JS → ネイティブ: `window.webkit.messageHandlers.bridge.postMessage({type:'reward.start', abilities:[{id,name}]})`
+/// - ネイティブ → JS: `window.__claimRewards([abilityId,...])` を evaluateJavaScript で呼ぶ
+/// WKWebView を所有し続けるので、報酬ゲームをオーバーレイしても接続/状態が保たれる。
+final class WebBridge: NSObject, ObservableObject, WKScriptMessageHandler {
+    let webView: WKWebView
+    /// 報酬ミニゲーム開始要求（敵撃破時に Web から届く）。
+    var onRewardStart: (([RewardCardSpec]) -> Void)?
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    private var currentURL: URL?
 
-    func makeUIView(context: Context) -> WKWebView {
+    override init() {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
-        let webView = WKWebView(frame: .zero, configuration: config)
+        webView = WKWebView(frame: .zero, configuration: config)
+        super.init()
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
-        webView.navigationDelegate = context.coordinator
+        webView.configuration.userContentController.add(self, name: "bridge")
+    }
+
+    /// 指定URLを読み込む（既読込と同じなら何もしない）。
+    func load(_ url: URL) {
+        guard url != currentURL else { return }
+        currentURL = url
         webView.load(URLRequest(url: url))
-        context.coordinator.currentURL = url
-        context.coordinator.reloadToken = reloadToken
-        return webView
     }
 
-    func updateUIView(_ webView: WKWebView, context: Context) {
-        // URL変更時は読み直す。
-        if context.coordinator.currentURL != url {
-            context.coordinator.currentURL = url
-            webView.load(URLRequest(url: url))
-            return
-        }
-        // リロードトークンが進んだら再読み込み。
-        if context.coordinator.reloadToken != reloadToken {
-            context.coordinator.reloadToken = reloadToken
-            webView.reload()
-        }
+    func reload() {
+        webView.reload()
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
-        var currentURL: URL?
-        var reloadToken: Int = 0
+    /// 獲得した強化能力IDを Web に渡す（Web 側が cmd.reward.claim を送る）。
+    func claimRewards(_ abilityIds: [String]) {
+        let json =
+            (try? JSONSerialization.data(withJSONObject: abilityIds))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        webView.evaluateJavaScript("window.__claimRewards && window.__claimRewards(\(json))")
     }
+
+    func userContentController(
+        _ userContentController: WKUserContentController,
+        didReceive message: WKScriptMessage
+    ) {
+        guard
+            message.name == "bridge",
+            let dict = message.body as? [String: Any],
+            dict["type"] as? String == "reward.start"
+        else { return }
+        let abilities = (dict["abilities"] as? [[String: Any]]) ?? []
+        let specs = abilities.compactMap { entry -> RewardCardSpec? in
+            guard let id = entry["id"] as? String, let name = entry["name"] as? String else { return nil }
+            return RewardCardSpec(abilityId: id, name: name)
+        }
+        DispatchQueue.main.async { [weak self] in self?.onRewardStart?(specs) }
+    }
+}
+
+/// WebBridge が所有する WKWebView を SwiftUI に表示するだけのラッパー。
+struct WebViewContainer: UIViewRepresentable {
+    let webView: WKWebView
+    func makeUIView(context: Context) -> WKWebView { webView }
+    func updateUIView(_ webView: WKWebView, context: Context) {}
 }

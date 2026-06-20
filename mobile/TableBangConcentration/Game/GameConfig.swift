@@ -51,6 +51,8 @@ struct GameConfig {
     var comboMultiplierStep: Float
     /// 1ペア成立あたりの基礎得点。
     var scorePerPair: Int
+    /// 振り下ろし回数の上限（報酬モードで使用）。nil なら無制限（全ペア回収でクリア）。
+    var maxSwings: Int? = nil
 }
 
 extension GameConfig {

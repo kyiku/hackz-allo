@@ -26,8 +26,22 @@ final class GameEngine: ObservableObject {
     /// 配置可能な水平面を検出済みか（配置ガイド表示に使う, R1-5）。
     @Published private(set) var isPlaneReady: Bool = false
 
-    init(config: GameConfig = .default) {
+    /// 報酬モードの報酬カード仕様（nil なら通常の神経衰弱）。
+    private let rewardSpecs: [RewardCardSpec]?
+
+    /// 報酬モードで獲得した強化能力ID（クリア時に取り出す）。
+    var acquiredAbilityIds: [String] { cardManager.collectedAbilityIds }
+
+    /// 報酬モードの GameEngine を作る（3回振り下ろし上限＋報酬カード）。
+    static func reward(specs: [RewardCardSpec], maxSwings: Int = 3) -> GameEngine {
+        var config = GameConfig.default
+        config.maxSwings = maxSwings
+        return GameEngine(config: config, rewardSpecs: specs)
+    }
+
+    init(config: GameConfig = .default, rewardSpecs: [RewardCardSpec]? = nil) {
         self.config = config
+        self.rewardSpecs = rewardSpecs
         let scene = ARSceneController(config: config)
         let cardManager = CardManager()
         let gameState = GameStateManager(config: config)
@@ -106,7 +120,11 @@ final class GameEngine: ObservableObject {
         }
         boardAnchor = anchor
         cardManager.attach(to: anchor)
-        cardManager.buildBoard(config: config)
+        if let rewardSpecs {
+            cardManager.buildRewardBoard(specs: rewardSpecs, config: config)
+        } else {
+            cardManager.buildBoard(config: config)
+        }
         gameState.startPlaying(totalPairs: cardManager.remainingPairs)
     }
 

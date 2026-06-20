@@ -7,18 +7,31 @@ import RealityKit
 final class CardEntity: Entity, HasModel, HasPhysics, MatchableCard {
     let rank: Int
     let suit: Suit
+    /// 報酬カードのとき、対応する強化能力ID（標準カードは nil）。
+    let abilityId: String?
+    /// 報酬カードの表示名。
+    let rewardName: String?
     private(set) var state: CardState
 
     /// 伏せ初期姿勢: 表面ローカル +Y を下に向ける（X軸まわり180°）。
     private static let faceDownOrientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(1, 0, 0))
 
     var isFaceUp: Bool { state == .faceUp }
-    /// 同ランク＋同色で一致（A♠↔A♣, A♥↔A♦）。
-    var matchKey: Int { rank * 2 + (suit.isRed ? 1 : 0) }
+    /// 報酬カードは能力IDで一致、標準は同ランク＋同色で一致。
+    var matchKey: Int {
+        if abilityId != nil { return 1000 + rank }
+        return rank * 2 + (suit.isRed ? 1 : 0)
+    }
 
-    init(rank: Int, suit: Suit, config: GameConfig) {
-        self.rank = rank
-        self.suit = suit
+    convenience init(rank: Int, suit: Suit, config: GameConfig) {
+        self.init(card: Card(rank: rank, suit: suit), config: config)
+    }
+
+    init(card: Card, config: GameConfig) {
+        self.rank = card.rank
+        self.suit = card.suit
+        self.abilityId = card.abilityId
+        self.rewardName = card.rewardName
         self.state = .faceDown
         super.init()
 
@@ -59,7 +72,9 @@ final class CardEntity: Entity, HasModel, HasPhysics, MatchableCard {
         let plane = MeshResource.generatePlane(width: config.cardSize.x, depth: config.cardSize.z)
         let lift = config.cardSize.y / 2 + 0.0003
 
-        let face = ModelEntity(mesh: plane, materials: [CardFace.faceMaterial(rank: rank, suit: suit)])
+        let faceMaterial: RealityKit.Material = rewardName.map { CardFace.rewardFaceMaterial(name: $0) }
+            ?? CardFace.faceMaterial(rank: rank, suit: suit)
+        let face = ModelEntity(mesh: plane, materials: [faceMaterial])
         face.position = SIMD3<Float>(0, lift, 0) // +Y 面（法線 +Y、上から見える）
         addChild(face)
 

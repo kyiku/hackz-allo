@@ -31,22 +31,36 @@ final class CardManager: CardManaging {
         anchor.addChild(root)
     }
 
+    /// 回収済み報酬カードの能力ID（報酬モードの結果）。
+    private(set) var collectedAbilityIds: [String] = []
+
     func buildBoard(config: GameConfig) {
+        install(deck: DeckFactory.makeStandardDeck(), columns: config.gridColumns, config: config)
+    }
+
+    /// 報酬デッキ（能力ペア）で盤面を組む。少数枚なので列数は内容に合わせて詰める。
+    func buildRewardBoard(specs: [RewardCardSpec], config: GameConfig) {
+        let deck = DeckFactory.makeRewardDeck(specs: specs)
+        let columns = max(2, min(deck.count, 4))
+        install(deck: deck, columns: columns, config: config)
+    }
+
+    private func install(deck: [Card], columns: Int, config: GameConfig) {
         // 既存盤面をクリア。
         cards.forEach { $0.removeFromParent() }
         boundaries.forEach { $0.removeFromParent() }
         cards = []
         boundaries = []
+        collectedAbilityIds = []
 
-        let deck = DeckFactory.makeStandardDeck()
         let positions = BoardLayout.gridPositions(
             count: deck.count,
-            columns: config.gridColumns,
+            columns: columns,
             spacing: config.cardSpacing
         )
 
         for (card, position) in zip(deck, positions) {
-            let entity = CardEntity(rank: card.rank, suit: card.suit, config: config)
+            let entity = CardEntity(card: card, config: config)
             entity.position = position
             root.addChild(entity)
             cards.append(entity)
@@ -66,6 +80,12 @@ final class CardManager: CardManaging {
     }
 
     func collect(_ cards: [CardEntity]) {
+        // 報酬カードは1ペア=同一能力2枚。重複を避けて能力IDを1回だけ記録する。
+        for card in cards {
+            if let abilityId = card.abilityId, !collectedAbilityIds.contains(abilityId) {
+                collectedAbilityIds.append(abilityId)
+            }
+        }
         cards.forEach { $0.markCollected() }
         self.cards.removeAll { card in cards.contains { $0 === card } }
     }

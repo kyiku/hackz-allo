@@ -17,6 +17,17 @@ enum CardFace {
         return unlit(texture)
     }
 
+    /// 報酬カードの表面マテリアル（強化アイテム名を描画）。名前ごとにキャッシュする。
+    static func rewardFaceMaterial(name: String) -> RealityKit.Material {
+        let key = "reward:\(name)"
+        if let cached = faceTextures[key] { return unlit(cached) }
+        guard let cgImage = renderRewardFace(name: name).cgImage,
+              let texture = try? TextureResource.generate(from: cgImage, options: .init(semantic: .color))
+        else { return SimpleMaterial(color: .systemYellow, isMetallic: false) }
+        faceTextures[key] = texture
+        return unlit(texture)
+    }
+
     /// 裏面マテリアル（カード裏の模様）。
     static func backMaterial() -> RealityKit.Material {
         guard let texture = backTexture() else {
@@ -121,6 +132,42 @@ enum CardFace {
             }
             lattice.lineWidth = 2
             lattice.stroke()
+        }
+    }
+
+    /// 報酬カードの表面（金枠＋⚡アイコン＋強化アイテム名）を描く。
+    private static func renderRewardFace(name: String) -> UIImage {
+        let size = CGSize(width: 200, height: 300)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { context in
+            UIColor(red: 0.99, green: 0.97, blue: 0.86, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+
+            let border = UIBezierPath(
+                roundedRect: CGRect(x: 6, y: 6, width: size.width - 12, height: size.height - 12),
+                cornerRadius: 16
+            )
+            UIColor(red: 0.85, green: 0.65, blue: 0.13, alpha: 1).setStroke()
+            border.lineWidth = 6
+            border.stroke()
+
+            let para = NSMutableParagraphStyle()
+            para.alignment = .center
+
+            // 上部アイコン
+            ("⚡" as NSString).draw(
+                in: CGRect(x: 0, y: 26, width: size.width, height: 90),
+                withAttributes: [.font: UIFont.systemFont(ofSize: 76), .paragraphStyle: para]
+            )
+            // 中央に強化アイテム名（折り返し）
+            (name as NSString).draw(
+                in: CGRect(x: 12, y: 130, width: size.width - 24, height: 150),
+                withAttributes: [
+                    .font: UIFont.boldSystemFont(ofSize: 26),
+                    .foregroundColor: UIColor(red: 0.45, green: 0.32, blue: 0.05, alpha: 1),
+                    .paragraphStyle: para,
+                ]
+            )
         }
     }
 }
