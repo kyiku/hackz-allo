@@ -1,6 +1,6 @@
 import type { RepoRef } from '@github-issue-rpg/shared'
 import type { IssueListItem, OctokitLike } from './octokit-like.js'
-import type { GitHubIssue, RepoConnection } from './types.js'
+import type { CreatePullRequestParams, GitHubIssue, PullRequest, RepoConnection } from './types.js'
 
 export interface GitHubGatewayDeps {
   octokit: OctokitLike
@@ -9,6 +9,17 @@ export interface GitHubGatewayDeps {
 export interface GitHubGateway {
   listIssues(repo: RepoRef): Promise<GitHubIssue[]>
   connectRepository(repo: RepoRef): Promise<RepoConnection>
+  createPullRequest(params: CreatePullRequestParams): Promise<PullRequest>
+}
+
+/** 本文に対象issueの closing keyword を保証する（マージ時にissue自動close）。 */
+function withClosingKeyword(body: string | undefined, issueNumber: number): string {
+  const base = body ?? ''
+  const keyword = `Fixes #${issueNumber}`
+  if (new RegExp(`\\bFixes #${issueNumber}\\b`).test(base)) {
+    return base
+  }
+  return base ? `${base}\n\n${keyword}` : keyword
 }
 
 function labelName(label: { name?: string } | string): string | undefined {
@@ -82,6 +93,18 @@ export function createGitHubGateway({ octokit }: GitHubGatewayDeps): GitHubGatew
         defaultBranch: result.data.default_branch,
         canPush,
       }
+    },
+
+    async createPullRequest(params) {
+      const { data } = await octokit.rest.pulls.create({
+        owner: params.repo.owner,
+        repo: params.repo.name,
+        title: params.title,
+        head: params.head,
+        base: params.base,
+        body: withClosingKeyword(params.body, params.issueNumber),
+      })
+      return { number: data.number, url: data.html_url, nodeId: data.node_id }
     },
   }
 }
