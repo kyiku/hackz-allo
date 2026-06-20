@@ -32,6 +32,7 @@ export interface GitHubGateway {
   createPullRequest(params: CreatePullRequestParams): Promise<PullRequest>
   getCIStatus(repo: RepoRef, ref: string): Promise<CIStatus>
   enableAutoMerge(params: EnableAutoMergeParams): Promise<AutoMergeResult>
+  getDiff(repo: RepoRef, prNumber: number): Promise<string>
 }
 
 /** 本文に対象issueの closing keyword を保証する（マージ時にissue自動close）。 */
@@ -158,6 +159,17 @@ export function createGitHubGateway({ octokit }: GitHubGatewayDeps): GitHubGatew
           })
         },
       })
+    },
+
+    async getDiff(repo, prNumber) {
+      const { data } = await octokit.rest.pulls.get({
+        owner: repo.owner,
+        repo: repo.name,
+        pull_number: prNumber,
+        mediaType: { format: 'diff' },
+      })
+      // mediaType=diff のとき data は diff 文字列。
+      return typeof data === 'string' ? data : String(data)
     },
   }
 }
