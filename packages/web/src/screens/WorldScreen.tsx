@@ -65,6 +65,13 @@ export function WorldScreen() {
     }
   }, [battleList, pendingBattleIssue])
 
+  // 念のための保険: battle.started が来ないまま 90 秒経ったら準備中表示を閉じる（固まり防止）。
+  useEffect(() => {
+    if (pendingBattleIssue === null) return
+    const timer = setTimeout(() => setPendingBattleIssue(null), 90000)
+    return () => clearTimeout(timer)
+  }, [pendingBattleIssue])
+
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-rpg-bg text-rpg-ink">
       {/* フルスクリーンマップ（主役） */}

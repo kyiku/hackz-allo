@@ -45,10 +45,13 @@ export async function runForgeBattle(
 
   const issue = await deps.getIssue(issueNumber)
   if (!issue) {
+    // 敵が見つからない（既にクローズ済み等）。戦闘を開始扱いにしてから失敗を通知し、
+    // クライアントの「準備中」表示が battle.started を待ち続けて固まらないようにする。
+    await deps.emit({ type: 'battle.started', battleId, enemyId: issueNumber, hpTotal: 1 })
     await deps.emit({
       type: 'battle.failed',
       battleId,
-      reason: `issue #${issueNumber} が見つかりません`,
+      reason: `issue #${issueNumber} が見つかりません（既にクローズ済みかもしれません）`,
     })
     return
   }
@@ -59,9 +62,18 @@ export async function runForgeBattle(
     const tests = await deps.generateTests(issue).catch(() => [] as string[])
     const hpTotal = Math.max(1, tests.length)
 
+    // 準備（clone）より前に battle.started を出す。これでクライアントは即座に戦闘へ遷移でき、
+    // 以降の clone/エージェント/テストの失敗も「開始済みの戦闘」の battle.failed として届く。
+    await deps.emit({ type: 'battle.started', battleId, enemyId: issueNumber, hpTotal })
+
     const workspace = await deps.prepareWorkspace(issueNumber, timestamp)
     workspacePath = workspace.path
-    await deps.emit({ type: 'battle.started', battleId, enemyId: issueNumber, hpTotal })
+    await deps.emit({
+      type: 'battle.log',
+      battleId,
+      line: '🌿 作業環境を準備しました。AIが解析を開始します…',
+      kind: 'system',
+    })
 
     // ForgeAgent を起動し、メッセージを戦闘ログへ変換して配信
     const prompt = buildForgePrompt(issue, tests)

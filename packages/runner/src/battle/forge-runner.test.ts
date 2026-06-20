@@ -37,6 +37,7 @@ describe('runForgeBattle', () => {
 
     expect(types(events)).toEqual([
       'battle.started',
+      'battle.log', // 🌿 準備完了
       'battle.log', // エージェントのテキスト
       'battle.hp_changed', // hp 1
       'battle.hp_changed', // hp 0
@@ -63,11 +64,11 @@ describe('runForgeBattle', () => {
     expect(deps.cleanup).toHaveBeenCalled()
   })
 
-  it('issueが無ければ battle.failed（準備もしない）', async () => {
+  it('issueが無ければ started→failed（準備はしない／UIが固まらない）', async () => {
     const { deps, events } = makeDeps({ getIssue: vi.fn(async () => null) })
     await runForgeBattle(deps, { issueNumber: 99 })
 
-    expect(types(events)).toEqual(['battle.failed'])
+    expect(types(events)).toEqual(['battle.started', 'battle.failed'])
     expect(deps.prepareWorkspace).not.toHaveBeenCalled()
   })
 

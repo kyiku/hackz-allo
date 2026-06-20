@@ -62,9 +62,12 @@ export function createNodeForgeBattle(
   return async function forgeBattle(issueNumber: number): Promise<void> {
     const repoUrl = config.getRepoUrl()
     if (!repoUrl) {
+      // battle.started を先に出してから失敗を通知し、クライアントの準備中表示が固まらないようにする。
+      const battleId = `forge-${issueNumber}-0`
+      await config.backend.emit({ type: 'battle.started', battleId, enemyId: issueNumber, hpTotal: 1 })
       await config.backend.emit({
         type: 'battle.failed',
-        battleId: `forge-${issueNumber}-0`,
+        battleId,
         reason: 'リポジトリ未接続です。先にワールドへ接続してください。',
       })
       return
