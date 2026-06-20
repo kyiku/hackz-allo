@@ -44,6 +44,13 @@ export interface OctokitLike {
         state?: 'open' | 'closed' | 'all'
         per_page?: number
       }): Promise<{ data: IssueListItem[] }>
+      create(params: {
+        owner: string
+        repo: string
+        title: string
+        body?: string
+        labels?: string[]
+      }): Promise<{ data: { number: number; html_url: string } }>
     }
     checks: {
       listForRef(params: {

@@ -33,6 +33,13 @@ export interface GitHubGateway {
   getCIStatus(repo: RepoRef, ref: string): Promise<CIStatus>
   enableAutoMerge(params: EnableAutoMergeParams): Promise<AutoMergeResult>
   getDiff(repo: RepoRef, prNumber: number): Promise<string>
+  createIssue(repo: RepoRef, params: { title: string; body?: string; labels?: string[] }): Promise<CreatedIssue>
+}
+
+/** 作成されたissue。 */
+export interface CreatedIssue {
+  number: number
+  url: string
 }
 
 /** 本文に対象issueの closing keyword を保証する（マージ時にissue自動close）。 */
@@ -170,6 +177,17 @@ export function createGitHubGateway({ octokit }: GitHubGatewayDeps): GitHubGatew
       })
       // mediaType=diff のとき data は diff 文字列。
       return typeof data === 'string' ? data : String(data)
+    },
+
+    async createIssue(repo, params) {
+      const { data } = await octokit.rest.issues.create({
+        owner: repo.owner,
+        repo: repo.name,
+        title: params.title,
+        body: params.body,
+        labels: params.labels,
+      })
+      return { number: data.number, url: data.html_url }
     },
   }
 }
