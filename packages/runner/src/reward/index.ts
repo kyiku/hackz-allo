@@ -12,3 +12,9 @@ export {
   type PlayerProgress,
   type ExpGainResult,
 } from './leveling.js'
+export {
+  buildAbilityInjection,
+  buildForgeOptionsWithAbilities,
+  type AbilityInjection,
+  type ForgeOptionsWithAbilities,
+} from './ability-injection.js'
