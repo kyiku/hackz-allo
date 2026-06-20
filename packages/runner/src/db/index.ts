@@ -14,3 +14,8 @@ export {
   type WorkLogRepository,
   type WorkLog,
 } from './repositories/work-log-repository.js'
+export {
+  createLoadoutRepository,
+  type LoadoutRepository,
+  type LoadoutUpdate,
+} from './repositories/loadout-repository.js'
