@@ -11,6 +11,7 @@
  *
  * .env からプロセス環境への注入は起動スクリプト(タスク11.1)または `node --env-file` で行う。
  */
+import { getAbility, type Ability } from '@github-issue-rpg/shared'
 import { createAgentStructuredGeneratorWithSdk } from './ai/index.js'
 import { createNodeForgeBattle } from './battle/index.js'
 import { loadConfig, type RunnerConfig } from './config/index.js'
@@ -59,6 +60,17 @@ function buildJobContext(config: RunnerConfig): JobContext {
     generator,
     backend,
     getRepoUrl: () => session.repoUrl,
+    // 装備中（equippedIds）の equipment を能力カタログへ解決して次戦に反映する。
+    getEquippedLoadout: () => {
+      const loadout = loadouts.getByPlayer(player.id)
+      const equipped = equipment.listByPlayer(player.id)
+      const equippedSet = new Set(loadout?.equippedIds ?? [])
+      const abilities = equipped
+        .filter((item) => equippedSet.has(item.id) && item.abilityId !== null)
+        .map((item) => getAbility(item.abilityId as string))
+        .filter((ability): ability is Ability => ability !== undefined)
+      return { abilities, partySize: loadout?.partySize ?? 1 }
+    },
   })
 
   return {

@@ -2,14 +2,46 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { Ability } from '@github-issue-rpg/shared'
 import { simpleGit } from 'simple-git'
 import type { StructuredGenerator } from '../ai/index.js'
 import { runForgeWithSdk } from '../ai/index.js'
 import { createGitHubGateway, createOctokit } from '../github/index.js'
+import { buildPartyAgents } from '../reward/party.js'
 import { fetchOpenIssues, parseRepoUrl, generateRequiredTests } from '../world/index.js'
 import type { BackendClient } from '../orchestration/backend-client.js'
 import { runForgeBattle, type ForgeRunnerDeps } from './forge-runner.js'
 import type { ForgeBattleIssue } from './forge-battle.js'
+
+/** 装備中の強化（能力＋仲間数）。次戦のエージェントに反映する。 */
+export interface EquippedLoadout {
+  abilities: Ability[]
+  partySize: number
+}
+
+/** 装備をエージェントのプロンプトへ注入する前置き文を作る。装備なしなら空文字。 */
+function buildLoadoutPrompt(loadout: EquippedLoadout): string {
+  const lines: string[] = []
+  if (loadout.abilities.length > 0) {
+    lines.push('## あなたが装備している強化（必ず作法として反映せよ）')
+    for (const ability of loadout.abilities) {
+      lines.push(`- ${ability.displayName}: ${ability.description}`)
+    }
+  }
+  const companions = buildPartyAgents(loadout.partySize)
+  if (companions.length > 0) {
+    const roles = companions.map((c) => c.name).join(', ')
+    lines.push(`## 仲間 ${companions.length} 体（${roles}）の視点も意識して品質を高めよ。`)
+  }
+  return lines.length > 0 ? `${lines.join('\n')}\n\n` : ''
+}
+
+/** 装備の要約（戦闘ログ表示用）。装備なしなら null。 */
+function describeLoadout(loadout: EquippedLoadout): string | null {
+  const names = loadout.abilities.map((a) => a.displayName)
+  if (loadout.partySize > 1) names.push(`仲間${loadout.partySize - 1}体`)
+  return names.length > 0 ? names.join(' / ') : null
+}
 
 /**
  * forge 戦闘の実依存配線（Node/外部I/O）。
@@ -23,6 +55,8 @@ export interface NodeForgeBattleDeps {
   backend: BackendClient
   /** 現在接続中のリポジトリURL（onConnect が設定）。未接続なら null。 */
   getRepoUrl(): string | null
+  /** 現在の装備（能力＋仲間数）。次戦のエージェントへ反映する。 */
+  getEquippedLoadout(): EquippedLoadout
 }
 
 /** コマンドを実行し exit code と末尾出力を返す（テスト/インストール用）。 */
@@ -75,6 +109,10 @@ export function createNodeForgeBattle(
     const { owner, name } = parseRepoUrl(repoUrl)
     const repo = { owner, name, url: repoUrl }
 
+    // 戦闘開始時点の装備をスナップショットし、プロンプト前置きと表示に使う。
+    const loadout = config.getEquippedLoadout()
+    const loadoutPrompt = buildLoadoutPrompt(loadout)
+
     const deps: ForgeRunnerDeps = {
       emit: (event) => config.backend.emit(event),
 
@@ -94,7 +132,10 @@ export function createNodeForgeBattle(
         return { path, branch }
       },
 
-      runAgent: ({ prompt, worktreePath }) => runForgeWithSdk({ prompt, worktreePath }),
+      runAgent: ({ prompt, worktreePath }) =>
+        runForgeWithSdk({ prompt: `${loadoutPrompt}${prompt}`, worktreePath }),
+
+      describeLoadout: () => describeLoadout(loadout),
 
       async runTests(worktreePath) {
         const install = await runCommand('npm', ['install', '--no-audit', '--no-fund'], worktreePath)

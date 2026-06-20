@@ -28,6 +28,8 @@ export interface ForgeRunnerDeps {
   publish(params: { worktreePath: string; branch: string; issue: ForgeBattleIssue }): Promise<string>
   /** 作業ツリーの後始末。 */
   cleanup(worktreePath: string): Promise<void>
+  /** 装備中の強化の要約（戦闘ログ表示用）。なければ null。 */
+  describeLoadout?(): string | null
   /** ブランチ/battleID 用のタイムスタンプ。 */
   now(): number
 }
@@ -65,6 +67,12 @@ export async function runForgeBattle(
     // 準備（clone）より前に battle.started を出す。これでクライアントは即座に戦闘へ遷移でき、
     // 以降の clone/エージェント/テストの失敗も「開始済みの戦闘」の battle.failed として届く。
     await deps.emit({ type: 'battle.started', battleId, enemyId: issueNumber, hpTotal })
+
+    // 装備中の強化を表示（実際の効果はエージェントのプロンプトに注入される）。
+    const buff = deps.describeLoadout?.()
+    if (buff) {
+      await deps.emit({ type: 'battle.log', battleId, line: `🎒 装備強化: ${buff}`, kind: 'system' })
+    }
 
     const workspace = await deps.prepareWorkspace(issueNumber, timestamp)
     workspacePath = workspace.path

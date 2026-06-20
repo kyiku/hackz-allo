@@ -64,6 +64,16 @@ describe('runForgeBattle', () => {
     expect(deps.cleanup).toHaveBeenCalled()
   })
 
+  it('装備があれば battle.started 直後に 🎒 装備強化ログを出す', async () => {
+    const { deps, events } = makeDeps({ describeLoadout: () => 'TDDの心得 / 叡智の書物' })
+    await runForgeBattle(deps, { issueNumber: 1 })
+    const buff = events.find(
+      (e): e is Extract<ServerEvent, { type: 'battle.log' }> =>
+        e.type === 'battle.log' && e.line.includes('🎒'),
+    )
+    expect(buff?.line).toContain('TDDの心得')
+  })
+
   it('issueが無ければ started→failed（準備はしない／UIが固まらない）', async () => {
     const { deps, events } = makeDeps({ getIssue: vi.fn(async () => null) })
     await runForgeBattle(deps, { issueNumber: 99 })
