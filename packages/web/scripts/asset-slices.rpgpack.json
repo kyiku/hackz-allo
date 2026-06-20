@@ -1,0 +1,7 @@
+{
+  "_README": "Kenney RPGパック(CC0, 64pxタイル, 1280x832)から地面/背景を切り出す。pnpm --filter @github-issue-rpg/web slice-assets scripts/asset-slices.rpgpack.json",
+  "source": "./sources/kenney-rpg-pack.png",
+  "out": "assets/sprites",
+  "tile": 64,
+  "slices": [{ "key": "town-bg", "x": 0, "y": 192, "w": 768, "h": 320 }]
+}

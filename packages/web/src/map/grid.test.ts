@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  blockedCells,
   cellKey,
   enemyAtCell,
   GRID,
+  LANDMARKS,
+  landmarkAtCell,
+  neighborCell,
   placeEnemies,
   PLAYER_START,
   RESERVED_CELLS,
@@ -111,7 +115,7 @@ describe('step', () => {
   })
 
   it('blockedセルへは進まない', () => {
-    const blocked = new Set([cellKey({ x: 1, y: 0 })])
+    const blocked = new Set([cellKey({ x: PLAYER_START.x + 1, y: PLAYER_START.y })])
     expect(step(PLAYER_START, 'right', GRID, blocked)).toEqual(PLAYER_START)
   })
 })
@@ -128,5 +132,37 @@ describe('enemyAtCell', () => {
   it('居なければ null', () => {
     const placements = new Map<number, Cell>([[10, { x: 3, y: 4 }]])
     expect(enemyAtCell({ x: 0, y: 0 }, placements)).toBeNull()
+  })
+})
+
+describe('neighborCell', () => {
+  it('各方向の隣接セルを返す', () => {
+    expect(neighborCell({ x: 5, y: 5 }, 'up')).toEqual({ x: 5, y: 4 })
+    expect(neighborCell({ x: 5, y: 5 }, 'right')).toEqual({ x: 6, y: 5 })
+  })
+  it('盤面外は null（stepと違い現在位置を返さない）', () => {
+    expect(neighborCell({ x: 0, y: 0 }, 'up')).toBeNull()
+    expect(neighborCell({ x: GRID.cols - 1, y: 0 }, 'right')).toBeNull()
+  })
+})
+
+describe('landmarkAtCell', () => {
+  it('ランドマークセルで種別を返す', () => {
+    expect(landmarkAtCell(LANDMARKS.blacksmith)).toBe('blacksmith')
+    expect(landmarkAtCell(LANDMARKS.tavern)).toBe('tavern')
+  })
+  it('それ以外は null', () => {
+    expect(landmarkAtCell({ x: 5, y: 5 })).toBeNull()
+  })
+})
+
+describe('blockedCells', () => {
+  it('ランドマークと敵セルを移動不可に含める', () => {
+    const placements = new Map<number, Cell>([[10, { x: 3, y: 4 }]])
+    const blocked = blockedCells(placements)
+    expect(blocked.has(cellKey({ x: 3, y: 4 }))).toBe(true)
+    expect(blocked.has(cellKey(LANDMARKS.blacksmith))).toBe(true)
+    expect(blocked.has(cellKey(LANDMARKS.tavern))).toBe(true)
+    expect(blocked.has(cellKey({ x: 0, y: 0 }))).toBe(false)
   })
 })

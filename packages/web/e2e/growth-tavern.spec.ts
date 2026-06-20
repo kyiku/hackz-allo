@@ -38,19 +38,19 @@ const fromTavern = enemy({ id: 11, issueNumber: 43, title: '酒場で生まれ�
 test('撃破→enemy.appearedで新敵反映→再戦撃破のループを観測する', async ({ page }) => {
   const ws = await mockGameSocket(page)
   await page.goto('/')
+  // タイトル → リポジトリ選択へ。
+  await page.getByRole('button', { name: 'はじめる' }).click()
   await expect(page.getByText('接続済み')).toBeVisible()
 
-  // ワールドに既存の敵が1体。
-  // 鍛冶屋の依頼セレクトにも同名の option が出るため、敵一覧の listitem に限定して検証する。
+  // ワールドに既存の敵が1体（world.state受信でワールド画面へ。マップcanvasのためDOM検証はしない）。
   const worldState: ServerEvent = { type: 'world.state', world, enemies: [first] }
   await ws.send(worldState)
-  await expect(page.getByRole('listitem').filter({ hasText: '#42 既存のバグ' })).toBeVisible()
 
   // 1体目を撃破して報酬を得る（成長ループの起点）。
   // 戦闘画面(BattleScreen)の描画を待ってからHPを動かす（イベント順序に依存させずflakyを避ける）。
   await ws.send({ type: 'battle.started', battleId: 'b1', enemyId: 10, hpTotal: 2 })
   await expect(page.getByText('b1・戦闘中')).toBeVisible()
-  // 敵一覧は "HP 2/2" のままなので、減少値 "1/2" は戦闘画面のみに現れ一意。
+  // 減少値 "1/2" は b1 の戦闘画面のみに現れ一意。
   await ws.send({ type: 'battle.hp_changed', battleId: 'b1', hpCurrent: 1 })
   await expect(page.getByText('1/2')).toBeVisible()
   await ws.send({
@@ -62,16 +62,13 @@ test('撃破→enemy.appearedで新敵反映→再戦撃破のループを観測
   await expect(page.getByText('b1・撃破')).toBeVisible()
   await expect(page.getByText(/報酬獲得: 熟練の証/)).toBeVisible()
 
-  // 酒場で登録した新issueが敵として出現する。
+  // 酒場で登録した新issueが敵としてワールドに反映される（マップcanvasに追加）。
   await ws.send({ type: 'enemy.appeared', enemy: fromTavern })
-  await expect(
-    page.getByRole('listitem').filter({ hasText: '#43 酒場で生まれた依頼' }),
-  ).toBeVisible()
 
   // 新しい敵も戦闘→撃破できる（ループの反復）。
   await ws.send({ type: 'battle.started', battleId: 'b2', enemyId: 11, hpTotal: 2 })
   await expect(page.getByText('b2・戦闘中')).toBeVisible()
-  // この時点で b1 は 0/2、敵一覧は 2/2 のため "1/2" は b2 の戦闘画面のみに現れ一意。
+  // この時点で b1 は 0/2 のため "1/2" は b2 の戦闘画面のみに現れ一意。
   await ws.send({ type: 'battle.hp_changed', battleId: 'b2', hpCurrent: 1 })
   await expect(page.getByText('1/2')).toBeVisible()
   await ws.send({

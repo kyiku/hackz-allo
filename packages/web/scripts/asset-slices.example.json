@@ -1,0 +1,15 @@
+{
+  "_README": "元画像(source)から指定矩形を切り出して public/<out>/<key>.png を生成する設定例。source を実画像へ、座標を実レイアウトへ合わせて使う。",
+  "source": "./tiny-town.png",
+  "out": "assets/sprites",
+  "tile": 48,
+  "slices": [
+    { "key": "player", "x": 0, "y": 0, "w": 48, "h": 48 },
+    { "key": "blacksmith", "x": 48, "y": 0, "w": 48, "h": 48 },
+    { "key": "tavern", "x": 96, "y": 0, "w": 48, "h": 48 },
+    { "key": "enemy-easy", "x": 0, "y": 48, "w": 48, "h": 48 },
+    { "key": "enemy-normal", "x": 48, "y": 48, "w": 48, "h": 48 },
+    { "key": "enemy-hard", "x": 96, "y": 48, "w": 48, "h": 48 },
+    { "key": "enemy-boss", "x": 0, "y": 96, "w": 48, "h": 48 }
+  ]
+}

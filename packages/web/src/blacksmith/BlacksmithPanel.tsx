@@ -28,24 +28,24 @@ export function BlacksmithPanel({ enemies, battles, onForge }: BlacksmithPanelPr
   }
 
   return (
-    <article className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-800/60 p-4">
+    <article className="rpg-window flex flex-col gap-3 p-4">
       <header className="flex items-center gap-2">
         <span className="text-xl">🔨</span>
-        <h3 className="text-base font-semibold text-slate-200">鍛冶屋</h3>
+        <h3 className="text-base text-rpg-gold">鍛冶屋</h3>
       </header>
 
       {candidates.length === 0 ? (
-        <p className="text-sm text-slate-500">依頼できるissueがありません。</p>
+        <p className="text-sm text-rpg-muted">依頼できるissueがありません。</p>
       ) : (
         <>
-          <label className="flex flex-col gap-1 text-sm text-slate-300">
-            対象issue
+          <label className="flex flex-col gap-1 text-sm text-rpg-ink">
+            <span className="rpg-label text-xs">対象issue</span>
             <select
               value={selectedId ?? ''}
               onChange={(event) =>
                 setSelectedId(event.target.value === '' ? null : Number(event.target.value))
               }
-              className="rounded border border-slate-600 bg-slate-900 px-3 py-1.5 text-sm text-slate-100"
+              className="rpg-input"
             >
               <option value="">— 選択してください —</option>
               {candidates.map((enemy) => (
@@ -60,7 +60,7 @@ export function BlacksmithPanel({ enemies, battles, onForge }: BlacksmithPanelPr
             type="button"
             onClick={requestForge}
             disabled={!selected}
-            className="self-start rounded bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+            className="rpg-btn rpg-btn-amber self-start"
           >
             鍛冶屋に依頼する
           </button>

@@ -11,10 +11,13 @@ import type { Difficulty } from '@github-issue-rpg/shared'
  */
 
 export type AssetKey =
+  | 'tiles'
   | 'town-bg'
+  | 'ground'
   | 'player'
   | 'blacksmith'
   | 'tavern'
+  | 'sage'
   | 'enemy-easy'
   | 'enemy-normal'
   | 'enemy-hard'
@@ -31,38 +34,60 @@ export interface AssetEntry {
 }
 
 export const ASSET_MANIFEST: Record<AssetKey, AssetEntry> = {
-  'town-bg': { key: 'town-bg', file: 'assets/bg/town.svg', label: '街（背景）', placeholder: true },
-  player: { key: 'player', file: 'assets/sprites/player.svg', label: '勇者', placeholder: true },
+  // tiles は Kenney RPGパック(CC0)の64pxタイルシート全体（地面/家/木/小物）。MapScene が
+  // スプライトシートとして読み込み、tileset.ts のフレーム番号で参照する。
+  // town-bg / ground は Kenney RPGパック(CC0)、player / sage / blacksmith / tavern / enemy-* は
+  // Kenney Tiny Dungeon(CC0) から切り出したPNG。再生成は scripts/asset-slices.*.json + `pnpm slice-assets`。
+  tiles: {
+    key: 'tiles',
+    file: 'assets/tiles/rpg-pack.png',
+    label: 'タイルシート（地面/家/木/小物）',
+    placeholder: false,
+  },
+  'town-bg': {
+    key: 'town-bg',
+    file: 'assets/sprites/town-bg.png',
+    label: '街（背景）',
+    placeholder: false,
+  },
+  ground: {
+    key: 'ground',
+    file: 'assets/sprites/ground.png',
+    label: '地面（床）',
+    placeholder: false,
+  },
+  player: { key: 'player', file: 'assets/sprites/player.png', label: '勇者', placeholder: false },
   blacksmith: {
     key: 'blacksmith',
-    file: 'assets/sprites/blacksmith.svg',
+    file: 'assets/sprites/blacksmith.png',
     label: '鍛冶屋',
-    placeholder: true,
+    placeholder: false,
   },
-  tavern: { key: 'tavern', file: 'assets/sprites/tavern.svg', label: '酒場', placeholder: true },
+  tavern: { key: 'tavern', file: 'assets/sprites/tavern.png', label: '酒場', placeholder: false },
+  sage: { key: 'sage', file: 'assets/sprites/sage.png', label: '賢者（編成）', placeholder: false },
   'enemy-easy': {
     key: 'enemy-easy',
-    file: 'assets/sprites/enemy-easy.svg',
+    file: 'assets/sprites/enemy-easy.png',
     label: '敵（easy）',
-    placeholder: true,
+    placeholder: false,
   },
   'enemy-normal': {
     key: 'enemy-normal',
-    file: 'assets/sprites/enemy-normal.svg',
+    file: 'assets/sprites/enemy-normal.png',
     label: '敵（normal）',
-    placeholder: true,
+    placeholder: false,
   },
   'enemy-hard': {
     key: 'enemy-hard',
-    file: 'assets/sprites/enemy-hard.svg',
+    file: 'assets/sprites/enemy-hard.png',
     label: '敵（hard）',
-    placeholder: true,
+    placeholder: false,
   },
   'enemy-boss': {
     key: 'enemy-boss',
-    file: 'assets/sprites/enemy-boss.svg',
+    file: 'assets/sprites/enemy-boss.png',
     label: '敵（boss）',
-    placeholder: true,
+    placeholder: false,
   },
 }
 
