@@ -23,6 +23,14 @@ export interface IssueListItem {
   pull_request?: unknown
 }
 
+export interface PullCreateResult {
+  data: {
+    number: number
+    html_url: string
+    node_id: string
+  }
+}
+
 export interface OctokitLike {
   rest: {
     repos: {
@@ -35,6 +43,16 @@ export interface OctokitLike {
         state?: 'open' | 'closed' | 'all'
         per_page?: number
       }): Promise<{ data: IssueListItem[] }>
+    }
+    pulls: {
+      create(params: {
+        owner: string
+        repo: string
+        title: string
+        head: string
+        base: string
+        body?: string
+      }): Promise<PullCreateResult>
     }
   }
 }
