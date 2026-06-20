@@ -68,6 +68,12 @@ export interface OctokitLike {
         pull_number: number
         merge_method?: 'merge' | 'squash' | 'rebase'
       }): Promise<unknown>
+      get(params: {
+        owner: string
+        repo: string
+        pull_number: number
+        mediaType?: { format?: string }
+      }): Promise<{ data: unknown }>
     }
   }
 }
