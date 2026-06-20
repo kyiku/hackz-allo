@@ -1,15 +1,19 @@
 import { createServer } from 'node:http'
-import { parseClientEvent, parseServerEvent } from '@github-issue-rpg/shared'
+import { parseServerEvent } from '@github-issue-rpg/shared'
 import express from 'express'
 import { WebSocketServer } from 'ws'
+import { handleClientMessage } from './client-dispatch.js'
 import { createEventHub } from './event-hub.js'
+import { createHttpRunnerClient } from './runner-client.js'
 
 const PORT = Number(process.env.PORT ?? 3001)
+const RUNNER_URL = process.env.RUNNER_URL ?? 'http://127.0.0.1:3002'
 
 const app = express()
 app.use(express.json())
 
 const hub = createEventHub()
+const runner = createHttpRunnerClient(RUNNER_URL)
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' })
@@ -41,13 +45,10 @@ wss.on('connection', (socket) => {
   }
 
   socket.on('message', (data) => {
-    try {
-      const event = parseClientEvent(JSON.parse(data.toString()))
-      // ディスパッチ(cmd.forge/spell等)はオーケストレーション(#36)で処理する。
-      socket.send(JSON.stringify({ type: 'ack', received: event.type }))
-    } catch {
-      socket.send(JSON.stringify({ type: 'error', message: 'invalid client event' }))
-    }
+    // 検証 → Runner へ転送 → ack/error 応答。副作用の実体は Runner が担う。
+    void handleClientMessage(data.toString(), runner).then((reply) => {
+      socket.send(JSON.stringify(reply))
+    })
   })
 
   socket.on('close', () => {
