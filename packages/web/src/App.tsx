@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { BlacksmithPanel } from './blacksmith/BlacksmithPanel'
 import { MapView } from './map/MapView'
 import { useGameStore, type ConnectionStatus } from './store/gameStore'
 import { ConnectedTavernPanel } from './tavern/TavernPanel'
@@ -67,6 +68,15 @@ export function App() {
         <MapView
           enemies={enemyList}
           onEngage={(issueNumber) => send({ type: 'cmd.forge', issueNumber })}
+        />
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold text-slate-200">鍛冶屋</h2>
+        <BlacksmithPanel
+          enemies={enemyList}
+          battles={battleList}
+          onForge={(issueNumber) => send({ type: 'cmd.forge', issueNumber })}
         />
       </section>
 
