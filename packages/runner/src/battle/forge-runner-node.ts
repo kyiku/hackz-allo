@@ -2,48 +2,30 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { Ability } from '@github-issue-rpg/shared'
+import { modelForTier, type Loadout } from '@github-issue-rpg/shared'
 import { simpleGit } from 'simple-git'
 import type { StructuredGenerator } from '../ai/index.js'
 import { runForgeWithSdk } from '../ai/index.js'
 import { createGitHubGateway, createOctokit } from '../github/index.js'
-import { buildPartyAgents } from '../reward/party.js'
-import { buildAbilityInjection } from '../reward/ability-injection.js'
-import { resolveAbilitySdkOptions } from '../reward/ability-sdk.js'
+import { resolveMcpServers } from '../reward/ability-sdk.js'
+import { buildPartyAgentDefinitions } from '../reward/party-agents.js'
 import type { ForgeInjection } from '../ai/forge-agent.js'
 import { fetchOpenIssues, parseRepoUrl, generateRequiredTests } from '../world/index.js'
 import type { BackendClient } from '../orchestration/backend-client.js'
 import { runForgeBattle, type ForgeRunnerDeps } from './forge-runner.js'
 import type { ForgeBattleIssue } from './forge-battle.js'
 
-/** 装備中の強化（能力＋仲間数）。次戦のエージェントに反映する。 */
-export interface EquippedLoadout {
-  abilities: Ability[]
-  partySize: number
-}
-
-/** 装備をエージェントのプロンプトへ注入する前置き文を作る。装備なしなら空文字。 */
-function buildLoadoutPrompt(loadout: EquippedLoadout): string {
-  const lines: string[] = []
-  if (loadout.abilities.length > 0) {
-    lines.push('## あなたが装備している強化（必ず作法として反映せよ）')
-    for (const ability of loadout.abilities) {
-      lines.push(`- ${ability.displayName}: ${ability.description}`)
-    }
+/** 編成の要約（戦闘ログ表示用）。何も強化されていなければ null。 */
+function describeLoadout(loadout: Loadout): string | null {
+  const parts: string[] = []
+  if (loadout.enabledMcpRefs.length > 0) {
+    parts.push(`MCP: ${loadout.enabledMcpRefs.join(', ')}`)
   }
-  const companions = buildPartyAgents(loadout.partySize)
-  if (companions.length > 0) {
-    const roles = companions.map((c) => c.name).join(', ')
-    lines.push(`## 仲間 ${companions.length} 体（${roles}）の視点も意識して品質を高めよ。`)
+  if (loadout.partySize > 1) {
+    parts.push(`仲間${loadout.partySize - 1}体`)
   }
-  return lines.length > 0 ? `${lines.join('\n')}\n\n` : ''
-}
-
-/** 装備の要約（戦闘ログ表示用）。装備なしなら null。 */
-function describeLoadout(loadout: EquippedLoadout): string | null {
-  const names = loadout.abilities.map((a) => a.displayName)
-  if (loadout.partySize > 1) names.push(`仲間${loadout.partySize - 1}体`)
-  return names.length > 0 ? names.join(' / ') : null
+  parts.push(`モデル: ${modelForTier(loadout.selectedModelTier)}`)
+  return parts.length > 0 ? parts.join(' / ') : null
 }
 
 /**
@@ -58,8 +40,8 @@ export interface NodeForgeBattleDeps {
   backend: BackendClient
   /** 現在接続中のリポジトリURL（onConnect が設定）。未接続なら null。 */
   getRepoUrl(): string | null
-  /** 現在の装備（能力＋仲間数）。次戦のエージェントへ反映する。 */
-  getEquippedLoadout(): EquippedLoadout
+  /** 現在の編成。次戦のエージェント（model/MCP/サブエージェント）へ反映する。 */
+  getEquippedLoadout(): Loadout
 }
 
 /** コマンドを実行し exit code と末尾出力を返す（テスト/インストール用）。 */
@@ -96,12 +78,6 @@ export function createNodeForgeBattle(
   const octokit = createOctokit(config.githubPat)
   const gateway = createGitHubGateway({ octokit })
 
-  // 装備能力の「実注入」フラグ（プロセス=セッション単位）。未設定なら従来どおりプロンプト前置きのみ。
-  const abilityInjectionEnabled = process.env.FORGE_ABILITY_INJECTION === '1'
-  if (abilityInjectionEnabled) {
-    console.log('[runner] 装備能力の実注入(MCP/skill)を有効化しました (FORGE_ABILITY_INJECTION=1)')
-  }
-
   return async function forgeBattle(issueNumber: number): Promise<void> {
     const repoUrl = config.getRepoUrl()
     if (!repoUrl) {
@@ -118,14 +94,16 @@ export function createNodeForgeBattle(
     const { owner, name } = parseRepoUrl(repoUrl)
     const repo = { owner, name, url: repoUrl }
 
-    // 戦闘開始時点の装備をスナップショットし、プロンプト前置きと表示に使う。
+    // 戦闘開始時点の編成をスナップショットし、SDKオプションへ実体注入する（戦闘ごとに解決）。
     const loadout = config.getEquippedLoadout()
-    const loadoutPrompt = buildLoadoutPrompt(loadout)
-
-    // フラグ有効時のみ、装備能力を query() の MCP/skill 設定へ実体注入する（戦闘ごとに解決）。
-    const injection: ForgeInjection | undefined = abilityInjectionEnabled
-      ? resolveAbilitySdkOptions(buildAbilityInjection(loadout.abilities.map((ability) => ability.id)))
-      : undefined
+    const injection: ForgeInjection = {
+      mcpServers: resolveMcpServers(loadout.enabledMcpRefs),
+      agents: buildPartyAgentDefinitions(loadout.partySize),
+    }
+    const model = modelForTier(loadout.selectedModelTier)
+    const loadoutPrompt = describeLoadout(loadout)
+      ? `## 編成: ${describeLoadout(loadout)}\n\n`
+      : ''
 
     const deps: ForgeRunnerDeps = {
       emit: (event) => config.backend.emit(event),
@@ -147,7 +125,7 @@ export function createNodeForgeBattle(
       },
 
       runAgent: ({ prompt, worktreePath }) =>
-        runForgeWithSdk({ prompt: `${loadoutPrompt}${prompt}`, worktreePath, injection }),
+        runForgeWithSdk({ prompt: `${loadoutPrompt}${prompt}`, worktreePath, model, injection }),
 
       describeLoadout: () => describeLoadout(loadout),
 
