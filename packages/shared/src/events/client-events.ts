@@ -12,11 +12,6 @@ export const clientEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('cmd.stop'), battleId: z.string() }),
   z.object({ type: z.literal('cmd.tavern'), message: z.string() }),
   z.object({ type: z.literal('cmd.tavern.publish'), draft: issueDraftSchema }),
-  z.object({
-    type: z.literal('cmd.loadout.equip'),
-    equipmentId: z.number().int(),
-    equipped: z.boolean(),
-  }),
   z.object({ type: z.literal('cmd.loadout.tune'), tuning: loadoutTuningSchema }),
   z.object({ type: z.literal('cmd.npc.talk'), enemyId: z.number().int() }),
   z.object({ type: z.literal('cmd.connect'), repoUrl: z.string().url() }),

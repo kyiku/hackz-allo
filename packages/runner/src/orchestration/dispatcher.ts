@@ -12,7 +12,6 @@ export interface JobHandlers {
   onStop(battleId: string): Promise<void>
   onTavern(message: string): Promise<void>
   onTavernPublish(draft: IssueDraft): Promise<void>
-  onLoadoutEquip(equipmentId: number, equipped: boolean): Promise<void>
   onLoadoutTune(tuning: LoadoutTuning): Promise<void>
   onNpcTalk(enemyId: number): Promise<void>
   onConnect(repoUrl: string): Promise<void>
@@ -39,8 +38,6 @@ export function createJobDispatcher(handlers: JobHandlers): JobDispatcher {
           return handlers.onTavern(event.message)
         case 'cmd.tavern.publish':
           return handlers.onTavernPublish(event.draft)
-        case 'cmd.loadout.equip':
-          return handlers.onLoadoutEquip(event.equipmentId, event.equipped)
         case 'cmd.loadout.tune':
           return handlers.onLoadoutTune(event.tuning)
         case 'cmd.npc.talk':

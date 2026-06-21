@@ -122,6 +122,36 @@ describe('createJobHandlers - reward claim', () => {
   })
 })
 
+describe('createJobHandlers - loadout tune/mcp', () => {
+  it('onLoadoutTune は partySize/modelTier を容量内にクランプ保存する', async () => {
+    const { ctx, loadouts } = makeContext({ ...INITIAL_LOADOUT, partySlots: 2, modelTierMax: 1 })
+    await createJobHandlers(ctx).onLoadoutTune({ partySize: 5, modelTier: 3 })
+    expect(loadouts.update).toHaveBeenCalledWith(
+      ctx.playerId,
+      expect.objectContaining({ partySize: 2, selectedModelTier: 1 }),
+    )
+  })
+
+  it('onLoadoutMcp は枠数とプールでクランプして保存する', async () => {
+    const { ctx, loadouts } = makeContext({ ...INITIAL_LOADOUT, mcpSlots: 1 })
+    await createJobHandlers(ctx).onLoadoutMcp(['github', 'context7', 'bogus'])
+    expect(loadouts.update).toHaveBeenCalledWith(
+      ctx.playerId,
+      expect.objectContaining({ enabledMcpRefs: ['github'] }),
+    )
+  })
+
+  it('dispatcher は cmd.loadout.mcp を onLoadoutMcp へルーティングする', async () => {
+    const { ctx, loadouts } = makeContext({ ...INITIAL_LOADOUT, mcpSlots: 1 })
+    const dispatcher = createJobDispatcher(createJobHandlers(ctx))
+    await dispatcher.dispatch({ type: 'cmd.loadout.mcp', refs: ['github'] })
+    expect(loadouts.update).toHaveBeenCalledWith(
+      ctx.playerId,
+      expect.objectContaining({ enabledMcpRefs: ['github'] }),
+    )
+  })
+})
+
 describe('createJobHandlers - 未結線', () => {
   it('dispatcher を構築できる', () => {
     const { ctx } = makeContext()

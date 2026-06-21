@@ -102,11 +102,6 @@ describe('parseClientEvent', () => {
     expect(parseClientEvent(event)).toEqual(event)
   })
 
-  it('cmd.loadout.equip をパースする', () => {
-    const event = { type: 'cmd.loadout.equip', equipmentId: 3, equipped: true }
-    expect(parseClientEvent(event)).toEqual(event)
-  })
-
   it('cmd.loadout.tune をパースする', () => {
     const event = { type: 'cmd.loadout.tune', tuning: { effort: 'high', partySize: 2 } }
     expect(parseClientEvent(event)).toEqual(event)

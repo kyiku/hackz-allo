@@ -1,5 +1,6 @@
 import {
   applyEffects,
+  clampAssignments,
   type ConnectErrorReason,
   type Enemy,
   type IssueDraft,
@@ -139,27 +140,23 @@ export function createJobHandlers(ctx: JobContext): JobHandlers {
       ctx.session.enemyIssueNumbers.add(created.number)
     },
 
-    async onLoadoutEquip(equipmentId: number, equipped: boolean): Promise<void> {
+    async onLoadoutTune(tuning: LoadoutTuning): Promise<void> {
       const loadout = ctx.loadouts.getByPlayer(ctx.playerId)
-      if (!loadout) {
-        throw new Error(`Loadout not found: player=${ctx.playerId}`)
-      }
-      const equippedIds = equipped
-        ? [...new Set([...loadout.equippedIds, equipmentId])]
-        : loadout.equippedIds.filter((id) => id !== equipmentId)
-      ctx.loadouts.update(ctx.playerId, { equippedIds, partySize: loadout.partySize })
+      if (!loadout) throw new Error(`Loadout not found: player=${ctx.playerId}`)
+      const next = clampAssignments({
+        ...loadout,
+        partySize: tuning.partySize ?? loadout.partySize,
+        selectedModelTier: tuning.modelTier ?? loadout.selectedModelTier,
+      })
+      ctx.loadouts.update(ctx.playerId, next)
       await emitPlayerStatus()
     },
 
-    async onLoadoutTune(tuning: LoadoutTuning): Promise<void> {
+    async onLoadoutMcp(refs: string[]): Promise<void> {
       const loadout = ctx.loadouts.getByPlayer(ctx.playerId)
-      if (!loadout) {
-        throw new Error(`Loadout not found: player=${ctx.playerId}`)
-      }
-      // Loadout に永続化できるのは partySize のみ。effort/model/permissionMode は
-      // 次戦の query() 実行時設定であり、編成テーブルには保存しない（design.md §8.9）。
-      const partySize = tuning.partySize ?? loadout.partySize
-      ctx.loadouts.update(ctx.playerId, { equippedIds: loadout.equippedIds, partySize })
+      if (!loadout) throw new Error(`Loadout not found: player=${ctx.playerId}`)
+      const next = clampAssignments({ ...loadout, enabledMcpRefs: refs })
+      ctx.loadouts.update(ctx.playerId, next)
       await emitPlayerStatus()
     },
 
@@ -189,8 +186,6 @@ export function createJobHandlers(ctx: JobContext): JobHandlers {
         })
       }
     },
-
-    onLoadoutMcp: notWired('cmd.loadout.mcp'),
 
     async onRewardClaim(effectIds: string[]): Promise<void> {
       // 台パン3回後に表向きだったカードの効果を loadout の枠へ反映する（合算・クランプは applyEffects）。
