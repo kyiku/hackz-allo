@@ -25,3 +25,4 @@ export {
   type SubagentHook,
   type DelegationLog,
 } from './party.js'
+export { buildPartyAgentDefinitions } from './party-agents.js'
