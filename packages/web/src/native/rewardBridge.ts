@@ -1,15 +1,15 @@
-import { ABILITY_CATALOG } from '@github-issue-rpg/shared'
+import { EFFECT_CATALOG } from '@github-issue-rpg/shared'
 
 /**
  * iOSネイティブ（WKWebView）との報酬ミニゲーム連携ブリッジ。
  * - 撃破時: `startRewardGame()` でネイティブにAR神経衰弱の起動を依頼
- * - ネイティブ側のクリア後: `window.__claimRewards(ids)` が呼ばれる → registerClaimHandler のハンドラへ
+ * - ネイティブ側のクリア後: `window.__claimRewards(effectIds)` が呼ばれる → registerClaimHandler のハンドラへ
  * ネイティブ外（通常ブラウザ）では postMessage は no-op（false を返す）。
  */
 
-export interface RewardAbility {
-  id: string
-  name: string
+export interface EffectCardSpec {
+  effectId: string
+  label: string
 }
 
 interface NativeBridgeWindow {
@@ -24,30 +24,41 @@ export function hasNativeBridge(): boolean {
   return Boolean(w.webkit?.messageHandlers?.bridge)
 }
 
-/** 報酬カード候補。既定は5種（神経衰弱の10枚＝5ペア）。敵番号をシードに選ぶ。 */
-export function rewardCandidates(seed: number, count = 5): RewardAbility[] {
-  const list = ABILITY_CATALOG
-  const out: RewardAbility[] = []
-  const total = list.length
-  for (let i = 0; i < Math.min(count, total); i += 1) {
-    const ability = list[(Math.abs(seed) + i) % total]
-    if (ability) out.push({ id: ability.id, name: ability.displayName })
+/** 盤面の効果カード（+1を多め、-1を少なめに重み付け）。seedで決定的に選ぶ。 */
+const WEIGHTED: readonly string[] = [
+  'eff.mcp.up',
+  'eff.mcp.up',
+  'eff.party.up',
+  'eff.party.up',
+  'eff.model.up',
+  'eff.model.up',
+  'eff.mcp.down',
+  'eff.party.down',
+  'eff.model.down', // -1は各1で控えめ
+]
+
+export function rewardEffectCards(seed: number, count = 6): EffectCardSpec[] {
+  const out: EffectCardSpec[] = []
+  for (let i = 0; i < count; i += 1) {
+    const id = WEIGHTED[(Math.abs(seed) + i) % WEIGHTED.length]
+    const eff = EFFECT_CATALOG.find((e) => e.id === id)
+    if (eff) out.push({ effectId: eff.id, label: eff.label })
   }
   return out
 }
 
 /** ネイティブにAR報酬ミニゲームの開始を依頼する。ネイティブでなければ false。 */
-export function startRewardGame(abilities: RewardAbility[]): boolean {
+export function startRewardGame(cards: EffectCardSpec[]): boolean {
   if (typeof window === 'undefined') return false
   const w = window as unknown as NativeBridgeWindow
   const handler = w.webkit?.messageHandlers?.bridge
   if (!handler) return false
-  handler.postMessage({ type: 'reward.start', abilities })
+  handler.postMessage({ type: 'reward.start', cards })
   return true
 }
 
-/** ネイティブからの報酬確定（獲得能力ID配列）を受けるハンドラを登録する。 */
-export function registerClaimHandler(handler: (abilityIds: string[]) => void): void {
+/** ネイティブからの報酬確定（獲得効果ID配列）を受けるハンドラを登録する。 */
+export function registerClaimHandler(handler: (effectIds: string[]) => void): void {
   if (typeof window === 'undefined') return
   const w = window as unknown as NativeBridgeWindow
   w.__claimRewards = (ids: unknown) => {
