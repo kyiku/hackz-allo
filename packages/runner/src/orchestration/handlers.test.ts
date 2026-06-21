@@ -1,16 +1,16 @@
-import type { Loadout } from '@github-issue-rpg/shared'
+import { INITIAL_LOADOUT, type Loadout } from '@github-issue-rpg/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { JobNotImplementedError, createJobHandlers, type JobContext } from './handlers'
 import { createJobDispatcher } from './dispatcher'
 import { GithubFetchError } from '../world/index.js'
 
-function inMemoryLoadouts(initial: Loadout = { equippedIds: [], partySize: 1 }) {
+function inMemoryLoadouts(initial: Loadout = INITIAL_LOADOUT) {
   let current = initial
   return {
     createForPlayer: vi.fn(() => current),
     getByPlayer: vi.fn(() => current),
-    update: vi.fn((_playerId: number, patch: { equippedIds: number[]; partySize: number }) => {
-      current = { equippedIds: patch.equippedIds, partySize: patch.partySize }
+    update: vi.fn((_playerId: number, loadout: Loadout) => {
+      current = loadout
       return current
     }),
   }
@@ -50,46 +50,6 @@ function makeContext(loadout?: Loadout): {
   }
   return { ctx, loadouts, generate }
 }
-
-describe('createJobHandlers - loadout', () => {
-  it('onLoadoutEquip(true) は装備IDを追加し player.status を配信する', async () => {
-    const { ctx, loadouts } = makeContext({ equippedIds: [], partySize: 1 })
-    const handlers = createJobHandlers(ctx)
-    await handlers.onLoadoutEquip(3, true)
-
-    expect(loadouts.update).toHaveBeenCalledWith(1, { equippedIds: [3], partySize: 1 })
-    expect(ctx.backend.emit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'player.status',
-        loadout: { equippedIds: [3], partySize: 1 },
-      }),
-    )
-  })
-
-  it('onLoadoutEquip(false) は装備IDを外す（重複なく）', async () => {
-    const { ctx, loadouts } = makeContext({ equippedIds: [3, 5], partySize: 2 })
-    await createJobHandlers(ctx).onLoadoutEquip(3, false)
-    expect(loadouts.update).toHaveBeenCalledWith(1, { equippedIds: [5], partySize: 2 })
-  })
-
-  it('onLoadoutEquip(true) は既に装備済みでも重複させない', async () => {
-    const { ctx, loadouts } = makeContext({ equippedIds: [3], partySize: 1 })
-    await createJobHandlers(ctx).onLoadoutEquip(3, true)
-    expect(loadouts.update).toHaveBeenCalledWith(1, { equippedIds: [3], partySize: 1 })
-  })
-
-  it('onLoadoutTune は partySize を更新し equippedIds は保持する', async () => {
-    const { ctx, loadouts } = makeContext({ equippedIds: [7], partySize: 1 })
-    await createJobHandlers(ctx).onLoadoutTune({ partySize: 4 })
-    expect(loadouts.update).toHaveBeenCalledWith(1, { equippedIds: [7], partySize: 4 })
-  })
-
-  it('onLoadoutTune で partySize 未指定なら現状維持', async () => {
-    const { ctx, loadouts } = makeContext({ equippedIds: [], partySize: 3 })
-    await createJobHandlers(ctx).onLoadoutTune({ effort: 'high' })
-    expect(loadouts.update).toHaveBeenCalledWith(1, { equippedIds: [], partySize: 3 })
-  })
-})
 
 describe('createJobHandlers - tavern', () => {
   it('onTavern は会話から issue 案を生成し tavern.issueDraft を配信する', async () => {
@@ -139,26 +99,26 @@ describe('createJobHandlers - tavern', () => {
 })
 
 describe('createJobHandlers - reward claim', () => {
-  it('onRewardClaim はカタログ能力を装備化し自動装備して player.status を配信する', async () => {
-    const { ctx, loadouts } = makeContext({ equippedIds: [], partySize: 1 })
-    await createJobHandlers(ctx).onRewardClaim(['ability.tdd-skill'])
+  it('onRewardClaim は表向き効果で loadout の枠を増やし player.status を配信する', async () => {
+    const { ctx, loadouts } = makeContext()
+    await createJobHandlers(ctx).onRewardClaim(['eff.mcp.up', 'eff.model.up'])
 
-    expect(ctx.equipment.createFromReward).toHaveBeenCalledWith(
-      1,
-      expect.objectContaining({ abilityId: 'ability.tdd-skill', kind: 'skill' }),
-      expect.any(String),
+    expect(loadouts.update).toHaveBeenCalledWith(
+      ctx.playerId,
+      expect.objectContaining({ mcpSlots: 1, modelTierMax: 1 }),
     )
-    expect(loadouts.update).toHaveBeenCalledWith(1, { equippedIds: [100], partySize: 1 })
     expect(ctx.backend.emit).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'player.status' }),
     )
   })
 
-  it('カタログに無い能力IDは無視する（不正強化を弾く）', async () => {
+  it('カタログに無い効果IDは無視する（クランプで不正強化を弾く）', async () => {
     const { ctx, loadouts } = makeContext()
-    await createJobHandlers(ctx).onRewardClaim(['ability.bogus'])
-    expect(ctx.equipment.createFromReward).not.toHaveBeenCalled()
-    expect(loadouts.update).not.toHaveBeenCalled()
+    await createJobHandlers(ctx).onRewardClaim(['eff.bogus'])
+    expect(loadouts.update).toHaveBeenCalledWith(
+      ctx.playerId,
+      expect.objectContaining({ mcpSlots: 0, modelTierMax: 0 }),
+    )
   })
 })
 
