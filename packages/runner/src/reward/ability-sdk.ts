@@ -39,6 +39,17 @@ export function mcpRegistryFromEnv(
   }
 }
 
+/** MCP ref 配列を registry で実 config へ解決する。該当ゼロなら undefined。 */
+export function resolveMcpServers(
+  refs: readonly string[],
+  registry: Record<string, McpServerConfig> = mcpRegistryFromEnv(),
+): Record<string, McpServerConfig> | undefined {
+  const entries = refs
+    .map((ref) => [ref, registry[ref]] as const)
+    .filter((e): e is readonly [string, McpServerConfig] => e[1] !== undefined)
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined
+}
+
 /** skill/plugin をディスクから読み込む設定ソース。ユーザーローカルのみ（クローン先repo設定の実行は避ける）。 */
 const SKILL_SETTING_SOURCES: readonly SettingSource[] = ['user']
 

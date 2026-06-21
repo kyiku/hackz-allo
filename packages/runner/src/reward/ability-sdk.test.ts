@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import { buildAbilityInjection } from './ability-injection'
-import { mcpRegistryFromEnv, resolveAbilitySdkOptions } from './ability-sdk'
+import { mcpRegistryFromEnv, resolveAbilitySdkOptions, resolveMcpServers } from './ability-sdk'
 
 const REGISTRY: Record<string, McpServerConfig> = {
   github: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' },
@@ -56,5 +56,15 @@ describe('mcpRegistryFromEnv', () => {
   it('配列や非オブジェクトは空表にフォールバックする', () => {
     expect(mcpRegistryFromEnv('[1,2,3]')).toEqual({})
     expect(mcpRegistryFromEnv('"str"')).toEqual({})
+  })
+})
+
+describe('resolveMcpServers', () => {
+  it('登録済みrefのみ実configを返し、未登録は無視', () => {
+    const reg = { github: { type: 'http', url: 'https://x/mcp' } } as const
+    expect(resolveMcpServers(['github', 'sqlite'], reg)).toEqual({ github: reg.github })
+  })
+  it('該当ゼロなら undefined', () => {
+    expect(resolveMcpServers([], {})).toBeUndefined()
   })
 })
