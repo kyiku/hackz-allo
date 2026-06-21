@@ -9,10 +9,11 @@ function handlers(): JobHandlers {
     onStop: vi.fn(async () => {}),
     onTavern: vi.fn(async () => {}),
     onTavernPublish: vi.fn(async () => {}),
-    onLoadoutEquip: vi.fn(async () => {}),
     onLoadoutTune: vi.fn(async () => {}),
     onNpcTalk: vi.fn(async () => {}),
     onConnect: vi.fn(async () => {}),
+    onRewardClaim: vi.fn(async () => {}),
+    onLoadoutMcp: vi.fn(async () => {}),
   }
 }
 

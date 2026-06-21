@@ -7,7 +7,6 @@ import {
   type LoadoutTuning,
 } from '@github-issue-rpg/shared'
 import type { StructuredGenerator } from '../ai/structured-generator.js'
-import type { EquipmentRepository } from '../db/repositories/equipment-repository.js'
 import type { LoadoutRepository } from '../db/repositories/loadout-repository.js'
 import type { PlayerRepository } from '../db/repositories/player-repository.js'
 import { buildPlayerStatusEvent } from '../loadout/projection.js'
@@ -50,7 +49,6 @@ export interface JobContext {
   backend: BackendClient
   players: PlayerRepository
   loadouts: LoadoutRepository
-  equipment: EquipmentRepository
   /** 構造化生成器（既定は Agent SDK = サブスク認証。酒場の issue 案生成等に使う）。 */
   generator: StructuredGenerator
   /** open issue を取得する（repo接続＝ワールド生成に使う。PATは内部に閉じる）。 */

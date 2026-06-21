@@ -26,7 +26,6 @@ import type { StructuredGenerator } from './ai/index.js'
 import type { BackendClient } from './orchestration/backend-client.js'
 import {
   createDatabase,
-  createEquipmentRepository,
   createLoadoutRepository,
   createPlayerRepository,
 } from './db/index.js'
@@ -47,7 +46,6 @@ function buildJobContext(config: RunnerConfig): JobContext {
   const db = createDatabase(DB_PATH)
   const players = createPlayerRepository(db)
   const loadouts = createLoadoutRepository(db)
-  const equipment = createEquipmentRepository(db)
 
   let player = players.findById(1)
   if (!player) {
@@ -79,7 +77,6 @@ function buildJobContext(config: RunnerConfig): JobContext {
     backend,
     players,
     loadouts,
-    equipment,
     // サブスク認証（Claude ログイン）で動く構造化生成器。APIキー不要。
     generator,
     // PAT は Runner 内に閉じ、owner/name を受けて open issue を取得する関数として渡す。

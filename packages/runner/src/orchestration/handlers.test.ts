@@ -32,15 +32,6 @@ function makeContext(loadout?: Loadout): {
       setLevel: vi.fn(),
     },
     loadouts,
-    equipment: {
-      createFromReward: vi.fn((_playerId: number, reward: { name: string; abilityId: string | null }) => ({
-        id: 100,
-        kind: 'skill',
-        name: reward.name,
-        abilityId: reward.abilityId,
-      })),
-      listByPlayer: vi.fn(() => []),
-    },
     generator: { generate },
     fetchIssues: vi.fn(async () => []),
     createIssue: vi.fn(async () => ({ number: 7, url: 'https://github.com/o/r/issues/7' })),

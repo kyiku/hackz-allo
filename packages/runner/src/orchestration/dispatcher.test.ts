@@ -8,11 +8,11 @@ function handlers() {
     onStop: vi.fn(async () => {}),
     onTavern: vi.fn(async () => {}),
     onTavernPublish: vi.fn(async () => {}),
-    onLoadoutEquip: vi.fn(async () => {}),
     onLoadoutTune: vi.fn(async () => {}),
     onNpcTalk: vi.fn(async () => {}),
     onConnect: vi.fn(async () => {}),
     onRewardClaim: vi.fn(async () => {}),
+    onLoadoutMcp: vi.fn(async () => {}),
   }
 }
 
@@ -48,7 +48,7 @@ describe('createJobDispatcher', () => {
     const h = handlers()
     await createJobDispatcher(h).dispatch({
       type: 'cmd.reward.claim',
-      abilityIds: ['ability.tdd-skill'],
+      effectIds: ['ability.tdd-skill'],
     })
     expect(h.onRewardClaim).toHaveBeenCalledWith(['ability.tdd-skill'])
   })
@@ -60,13 +60,17 @@ describe('createJobDispatcher', () => {
     expect(h.onTavernPublish).toHaveBeenCalledWith(draft)
   })
 
-  it('cmd.loadout.equip / cmd.loadout.tune を振り分ける', async () => {
+  it('cmd.loadout.tune を振り分ける', async () => {
     const h = handlers()
     const d = createJobDispatcher(h)
-    await d.dispatch({ type: 'cmd.loadout.equip', equipmentId: 3, equipped: true })
     await d.dispatch({ type: 'cmd.loadout.tune', tuning: { effort: 'high', partySize: 2 } })
-    expect(h.onLoadoutEquip).toHaveBeenCalledWith(3, true)
     expect(h.onLoadoutTune).toHaveBeenCalledWith({ effort: 'high', partySize: 2 })
+  })
+
+  it('cmd.loadout.mcp を onLoadoutMcp に振り分ける', async () => {
+    const h = handlers()
+    await createJobDispatcher(h).dispatch({ type: 'cmd.loadout.mcp', refs: ['mcp:github'] })
+    expect(h.onLoadoutMcp).toHaveBeenCalledWith(['mcp:github'])
   })
 
   it('cmd.npc.talk を onNpcTalk に振り分ける', async () => {

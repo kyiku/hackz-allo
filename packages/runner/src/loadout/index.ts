@@ -1,6 +1,1 @@
-export {
-  buildPlayerStatusEvent,
-  buildAssignmentsEvent,
-  buildAgentOptions,
-  type AgentOptions,
-} from './projection.js'
+export { buildPlayerStatusEvent, buildAssignmentsEvent } from './projection.js'
