@@ -9,7 +9,7 @@ struct RewardSession: Identifiable {
 /// アプリ起動直後に Issue RPG の Web アプリを全画面表示するルート。
 /// 表示先URLは設定で変更でき `UserDefaults` に保存する（デプロイ先/トンネルを差し替えやすく）。
 /// 敵撃破時に Web から届く `reward.start` で AR 神経衰弱（報酬）をオーバーレイ表示し、
-/// 獲得した強化能力を Web へ返す（`window.__claimRewards`）。
+/// 獲得した効果IDを Web へ返す（`window.__claimRewards`）。
 /// 既存のARゲーム(`RootView`)は温存しており、`TableBangApp` の表示を差し替えれば後から復帰できる。
 struct WebAppRootView: View {
     @StateObject private var bridge = WebBridge()
@@ -40,8 +40,8 @@ struct WebAppRootView: View {
         }
         .sheet(isPresented: $showSettings) { settingsSheet }
         .fullScreenCover(item: $rewardSession) { session in
-            RewardGameView(specs: session.specs) { acquiredIds in
-                bridge.claimRewards(acquiredIds)
+            RewardGameView(specs: session.specs) { acquiredEffectIds in
+                bridge.claimRewards(acquiredEffectIds)
                 rewardSession = nil
             }
         }
@@ -115,13 +115,14 @@ struct WebAppRootView: View {
         .navigationViewStyle(.stack)
     }
 
-    /// 動作確認用のサンプル報酬（5種＝神経衰弱10枚）。
+    /// 動作確認用のサンプル報酬（効果カード6枚）。web 側の重み付け配合に合わせる。
     static let sampleRewardSpecs: [RewardCardSpec] = [
-        RewardCardSpec(abilityId: "ability.tdd-skill", name: "TDDの心得"),
-        RewardCardSpec(abilityId: "ability.github-mcp", name: "github連携の籠手"),
-        RewardCardSpec(abilityId: "ability.refactor-plugin", name: "整地の杖"),
-        RewardCardSpec(abilityId: "ability.security-skill", name: "防壁の心得"),
-        RewardCardSpec(abilityId: "ability.context7-mcp", name: "叡智の書物"),
+        RewardCardSpec(effectId: "eff.mcp.up", label: "MCP枠+1"),
+        RewardCardSpec(effectId: "eff.party.up", label: "サブエージェント+1"),
+        RewardCardSpec(effectId: "eff.model.up", label: "モデル+1"),
+        RewardCardSpec(effectId: "eff.mcp.down", label: "MCP枠-1"),
+        RewardCardSpec(effectId: "eff.party.down", label: "サブエージェント-1"),
+        RewardCardSpec(effectId: "eff.model.down", label: "モデル-1"),
     ]
 
     private func openSettings() {

@@ -17,11 +17,11 @@ enum CardFace {
         return unlit(texture)
     }
 
-    /// 報酬カードの表面マテリアル（強化アイテム名を描画）。名前ごとにキャッシュする。
-    static func rewardFaceMaterial(name: String) -> RealityKit.Material {
-        let key = "reward:\(name)"
+    /// 報酬カードの表面マテリアル（効果ラベルを描画）。ラベルごとにキャッシュする。
+    static func rewardFaceMaterial(label: String) -> RealityKit.Material {
+        let key = "reward:\(label)"
         if let cached = faceTextures[key] { return unlit(cached) }
-        guard let cgImage = renderRewardFace(name: name).cgImage,
+        guard let cgImage = renderRewardFace(label: label).cgImage,
               let texture = try? TextureResource.generate(from: cgImage, options: .init(semantic: .color))
         else { return SimpleMaterial(color: .systemYellow, isMetallic: false) }
         faceTextures[key] = texture
@@ -135,8 +135,8 @@ enum CardFace {
         }
     }
 
-    /// 報酬カードの表面（金枠＋⚡アイコン＋強化アイテム名）を描く。
-    private static func renderRewardFace(name: String) -> UIImage {
+    /// 報酬カードの表面（金枠＋⚡アイコン＋効果ラベル）を描く。
+    private static func renderRewardFace(label: String) -> UIImage {
         let size = CGSize(width: 200, height: 300)
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { context in
@@ -159,8 +159,8 @@ enum CardFace {
                 in: CGRect(x: 0, y: 26, width: size.width, height: 90),
                 withAttributes: [.font: UIFont.systemFont(ofSize: 76), .paragraphStyle: para]
             )
-            // 中央に強化アイテム名（折り返し）
-            (name as NSString).draw(
+            // 中央に効果ラベル（折り返し）
+            (label as NSString).draw(
                 in: CGRect(x: 12, y: 130, width: size.width - 24, height: 150),
                 withAttributes: [
                     .font: UIFont.boldSystemFont(ofSize: 26),
