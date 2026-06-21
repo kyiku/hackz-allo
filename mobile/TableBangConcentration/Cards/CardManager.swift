@@ -8,6 +8,8 @@ protocol CardManaging: AnyObject {
     func buildBoard(config: GameConfig)
     func cards(within radius: Float, of center: SIMD3<Float>) -> [CardEntity]
     func collect(_ cards: [CardEntity])
+    /// 現在表向きの報酬カードの効果ID集合（報酬モードの確定で読み取る）。
+    func faceUpEffectIds() -> [String]
     var remainingPairs: Int { get }
     /// 盤面の中心（ルートのワールド座標）。台パンの衝撃波中心に用いる。
     var boardCenterWorld: SIMD3<Float> { get }
@@ -31,17 +33,27 @@ final class CardManager: CardManaging {
         anchor.addChild(root)
     }
 
-    /// 回収済み報酬カードの能力ID（報酬モードの結果）。
-    private(set) var collectedAbilityIds: [String] = []
+    /// 現在表向き（ひっくり返っている）の報酬カードの効果ID集合。
+    /// 報酬モードの確定（台パン3回後）で読み取る。重複は除く（同一効果カードは1枚だが安全のため）。
+    func faceUpEffectIds() -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+        for card in cards where card.isFaceUp {
+            guard let effectId = card.effectId, !seen.contains(effectId) else { continue }
+            seen.insert(effectId)
+            result.append(effectId)
+        }
+        return result
+    }
 
     func buildBoard(config: GameConfig) {
         install(deck: DeckFactory.makeStandardDeck(), columns: config.gridColumns, config: config)
     }
 
-    /// 報酬デッキ（能力ペア）で盤面を組む。少数枚なので列数は内容に合わせて詰める。
+    /// 報酬デッキ（効果カード1枚ずつ）で盤面を組む。少数枚なので列数は内容に合わせて詰める。
     func buildRewardBoard(specs: [RewardCardSpec], config: GameConfig) {
         let deck = DeckFactory.makeRewardDeck(specs: specs)
-        // 概ね2行に収まる列数（10枚なら5列×2行）。広がりすぎないよう最大6列。
+        // 概ね2行に収まる列数（6枚なら3列×2行）。広がりすぎないよう最大6列。
         let columns = max(2, min(6, Int(ceil(Double(deck.count) / 2.0))))
         install(deck: deck, columns: columns, config: config)
     }
@@ -52,7 +64,6 @@ final class CardManager: CardManaging {
         boundaries.forEach { $0.removeFromParent() }
         cards = []
         boundaries = []
-        collectedAbilityIds = []
 
         let positions = BoardLayout.gridPositions(
             count: deck.count,
@@ -80,13 +91,9 @@ final class CardManager: CardManaging {
         }
     }
 
+    /// 標準モードのペア回収（成立ペアを盤面から除去する）。
+    /// 報酬モードはペアを作らず台パン後の表向き読み取りで確定するため、この経路は使わない。
     func collect(_ cards: [CardEntity]) {
-        // 報酬カードは1ペア=同一能力2枚。重複を避けて能力IDを1回だけ記録する。
-        for card in cards {
-            if let abilityId = card.abilityId, !collectedAbilityIds.contains(abilityId) {
-                collectedAbilityIds.append(abilityId)
-            }
-        }
         cards.forEach { $0.markCollected() }
         self.cards.removeAll { card in cards.contains { $0 === card } }
     }

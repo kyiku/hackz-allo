@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { ABILITY_CATALOG, abilitySchema, getAbility } from './ability-catalog'
+import { ABILITY_CATALOG, abilitySchema, getAbility, mcpPool, mcpRefs } from './ability-catalog'
 
 describe('ABILITY_CATALOG', () => {
-  it('MVPの3能力を持つ', () => {
-    expect(ABILITY_CATALOG).toHaveLength(3)
+  it('能力を複数持つ', () => {
+    expect(ABILITY_CATALOG.length).toBeGreaterThanOrEqual(3)
   })
 
   it('全エントリがスキーマに適合する', () => {
@@ -13,8 +13,8 @@ describe('ABILITY_CATALOG', () => {
   })
 
   it('skill/mcp/plugin の3種別を網羅する', () => {
-    const kinds = ABILITY_CATALOG.map((a) => a.kind).sort()
-    expect(kinds).toEqual(['mcp', 'plugin', 'skill'])
+    const kinds = new Set(ABILITY_CATALOG.map((a) => a.kind))
+    expect([...kinds].sort()).toEqual(['mcp', 'plugin', 'skill'])
   })
 
   it('ability_id は一意', () => {
@@ -31,5 +31,13 @@ describe('getAbility', () => {
 
   it('未知のidは undefined', () => {
     expect(getAbility('ability.unknown')).toBeUndefined()
+  })
+})
+
+describe('mcpPool', () => {
+  it('mcp種別のみ返す', () => {
+    expect(mcpPool().every((a) => a.kind === 'mcp')).toBe(true)
+    expect(mcpRefs()).toContain('github')
+    expect(mcpRefs()).toContain('context7')
   })
 })

@@ -11,7 +11,7 @@
  *
  * .env からプロセス環境への注入は起動スクリプト(タスク11.1)または `node --env-file` で行う。
  */
-import { getAbility, type Ability } from '@github-issue-rpg/shared'
+import { INITIAL_LOADOUT } from '@github-issue-rpg/shared'
 import { createAgentStructuredGeneratorWithSdk } from './ai/index.js'
 import { createNodeForgeBattle } from './battle/index.js'
 import { loadConfig, type RunnerConfig } from './config/index.js'
@@ -26,7 +26,6 @@ import type { StructuredGenerator } from './ai/index.js'
 import type { BackendClient } from './orchestration/backend-client.js'
 import {
   createDatabase,
-  createEquipmentRepository,
   createLoadoutRepository,
   createPlayerRepository,
 } from './db/index.js'
@@ -47,7 +46,6 @@ function buildJobContext(config: RunnerConfig): JobContext {
   const db = createDatabase(DB_PATH)
   const players = createPlayerRepository(db)
   const loadouts = createLoadoutRepository(db)
-  const equipment = createEquipmentRepository(db)
 
   let player = players.findById(1)
   if (!player) {
@@ -71,24 +69,14 @@ function buildJobContext(config: RunnerConfig): JobContext {
     generator,
     backend,
     getRepoUrl: () => session.repoUrl,
-    // 装備中（equippedIds）の equipment を能力カタログへ解決して次戦に反映する。
-    getEquippedLoadout: () => {
-      const loadout = loadouts.getByPlayer(player.id)
-      const equipped = equipment.listByPlayer(player.id)
-      const equippedSet = new Set(loadout?.equippedIds ?? [])
-      const abilities = equipped
-        .filter((item) => equippedSet.has(item.id) && item.abilityId !== null)
-        .map((item) => getAbility(item.abilityId as string))
-        .filter((ability): ability is Ability => ability !== undefined)
-      return { abilities, partySize: loadout?.partySize ?? 1 }
-    },
+    // 現在の編成（model/MCP/partySize）を次戦のエージェントへ反映する。
+    getEquippedLoadout: () => loadouts.getByPlayer(player.id) ?? INITIAL_LOADOUT,
   })
 
   return {
     backend,
     players,
     loadouts,
-    equipment,
     // サブスク認証（Claude ログイン）で動く構造化生成器。APIキー不要。
     generator,
     // PAT は Runner 内に閉じ、owner/name を受けて open issue を取得する関数として渡す。

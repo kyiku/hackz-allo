@@ -128,8 +128,12 @@ CREATE TABLE IF NOT EXISTS equipment (
 CREATE TABLE IF NOT EXISTS loadouts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   player_id INTEGER NOT NULL REFERENCES players(id),
-  equipped_ids TEXT NOT NULL DEFAULT '[]',
-  party_size INTEGER NOT NULL DEFAULT 1
+  party_size INTEGER NOT NULL DEFAULT 1,
+  mcp_slots INTEGER NOT NULL DEFAULT 0,
+  party_slots INTEGER NOT NULL DEFAULT 1,
+  model_tier_max INTEGER NOT NULL DEFAULT 0,
+  enabled_mcp_refs TEXT NOT NULL DEFAULT '[]',
+  selected_model_tier INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS work_logs (
@@ -141,3 +145,12 @@ CREATE TABLE IF NOT EXISTS work_logs (
   created_at TEXT NOT NULL
 );
 `
+
+/** 既存loadoutsへ後方互換で列を足す冪等マイグレーション（列が無ければ追加）。 */
+export const LOADOUT_MIGRATION_COLUMNS: { name: string; ddl: string }[] = [
+  { name: 'mcp_slots', ddl: 'ALTER TABLE loadouts ADD COLUMN mcp_slots INTEGER NOT NULL DEFAULT 0' },
+  { name: 'party_slots', ddl: 'ALTER TABLE loadouts ADD COLUMN party_slots INTEGER NOT NULL DEFAULT 1' },
+  { name: 'model_tier_max', ddl: 'ALTER TABLE loadouts ADD COLUMN model_tier_max INTEGER NOT NULL DEFAULT 0' },
+  { name: 'enabled_mcp_refs', ddl: "ALTER TABLE loadouts ADD COLUMN enabled_mcp_refs TEXT NOT NULL DEFAULT '[]'" },
+  { name: 'selected_model_tier', ddl: 'ALTER TABLE loadouts ADD COLUMN selected_model_tier INTEGER NOT NULL DEFAULT 0' },
+]

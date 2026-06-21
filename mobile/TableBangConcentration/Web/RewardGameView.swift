@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// 敵撃破の報酬ミニゲーム（AR 台パン神経衰弱・報酬モード）。
-/// カード＝強化アイテム。平面に盤面を置き（または「目の前に置く」）、3回まで台パンして
-/// 当てたペアの能力を獲得する。クリア時に獲得能力IDを `onComplete` で返す。
+/// カード＝効果（枠の増減）。平面に盤面を置き（または「目の前に置く」）、3回台パンして
+/// 散らす。3回目（＋3秒バッファ）の時点で表向きになっているカードの効果を獲得する。
+/// クリア時に獲得効果IDを `onComplete` で返す。
 struct RewardGameView: View {
     let specs: [RewardCardSpec]
     let onComplete: ([String]) -> Void
@@ -16,9 +17,9 @@ struct RewardGameView: View {
         _engine = StateObject(wrappedValue: GameEngine.reward(specs: specs))
     }
 
-    /// 能力ID → 表示名（結果表示用）。
-    private var nameById: [String: String] {
-        Dictionary(uniqueKeysWithValues: specs.map { ($0.abilityId, $0.name) })
+    /// 効果ID → 表示ラベル（結果表示用）。
+    private var labelById: [String: String] {
+        Dictionary(specs.map { ($0.effectId, $0.label) }, uniquingKeysWith: { first, _ in first })
     }
 
     var body: some View {
@@ -111,15 +112,15 @@ struct RewardGameView: View {
             .padding(.leading, 16)
     }
 
-    /// AR描画に依存せず「今回の強化候補」を常時2Dで見せる（カード＝AI強化を明示）。
+    /// AR描画に依存せず「今回の効果候補」を常時2Dで見せる（カード＝効果を明示）。
     private var candidateBanner: some View {
         VStack(spacing: 4) {
-            Text("⚡ 強化候補（ペアを当てて獲得）")
+            Text("⚡ 効果候補（表向きにして獲得）")
                 .font(.caption.bold())
                 .foregroundStyle(.white.opacity(0.9))
             HStack(spacing: 6) {
-                ForEach(specs, id: \.abilityId) { spec in
-                    Text(spec.name)
+                ForEach(Array(specs.enumerated()), id: \.offset) { _, spec in
+                    Text(spec.label)
                         .font(.caption2.bold())
                         .lineLimit(1)
                         .padding(.horizontal, 8).padding(.vertical, 4)
@@ -137,16 +138,16 @@ struct RewardGameView: View {
     // MARK: - 結果
 
     private var resultView: some View {
-        let acquired = engine.acquiredAbilityIds
+        let acquired = engine.acquiredEffectIds
         return VStack(spacing: 18) {
             Spacer()
-            Text("⚡ 強化獲得！").font(.largeTitle.bold()).foregroundStyle(.white)
+            Text("⚡ 効果獲得！").font(.largeTitle.bold()).foregroundStyle(.white)
             if acquired.isEmpty {
-                Text("今回は当たらなかった…次は当てよう！").foregroundStyle(.white.opacity(0.85))
+                Text("表向きのカードがありませんでした…").foregroundStyle(.white.opacity(0.85))
             } else {
                 VStack(spacing: 10) {
                     ForEach(acquired, id: \.self) { id in
-                        Text("・\(nameById[id] ?? id)").font(.title3.bold()).foregroundStyle(.yellow)
+                        Text("・\(labelById[id] ?? id)").font(.title3.bold()).foregroundStyle(.yellow)
                     }
                 }
             }
@@ -169,7 +170,8 @@ struct RewardGameView: View {
         VStack {
             HStack {
                 Spacer()
-                Button(action: { onComplete(engine.acquiredAbilityIds) }) {
+                // 中断（3回未満）は確定しない＝効果を送らない。
+                Button(action: { onComplete([]) }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title2)
                         .foregroundStyle(.white.opacity(0.85))

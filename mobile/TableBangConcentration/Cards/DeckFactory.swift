@@ -23,22 +23,24 @@ enum Suit: CaseIterable, Equatable {
 struct Card: Equatable {
     let rank: Int
     let suit: Suit
-    /// 報酬カードのとき、対応する強化能力ID（標準カードは nil）。
-    var abilityId: String? = nil
-    /// 報酬カードのとき、面に表示する短い名前。
-    var rewardName: String? = nil
+    /// 報酬カードのとき、対応する効果ID（枠の増減）。標準カードは nil。
+    var effectId: String? = nil
+    /// 報酬カードのとき、面に表示する短いラベル。
+    var label: String? = nil
 
-    /// ペア判定キー。報酬カードは能力インデックス(rank)で一致、標準は同ランク＋同色。
+    /// ペア判定キー（標準モードのみ使用＝同ランク＋同色）。
+    /// 報酬カードは台パン後の表向き読み取りで確定するためペア判定には使わないが、
+    /// 効果ID単位で区別できるよう rank をオフセットしてキー化する。
     var matchKey: Int {
-        if abilityId != nil { return 1000 + rank }
+        if effectId != nil { return 1000 + rank }
         return rank * 2 + (suit.isRed ? 1 : 0)
     }
 }
 
-/// 報酬カードの素材（能力ID＋表示名）。神経衰弱の報酬デッキ生成に渡す。
+/// 報酬カードの素材（効果ID＋表示ラベル）。神経衰弱の報酬デッキ生成に渡す。
 struct RewardCardSpec: Equatable {
-    let abilityId: String
-    let name: String
+    let effectId: String
+    let label: String
 }
 
 /// 標準52枚デッキ（13ランク×4スート）を構築する。ペアは同ランク＋同色で必ず成立可能（26ペア）。
@@ -54,14 +56,11 @@ enum DeckFactory {
         return shuffled ? deck.shuffled() : deck
     }
 
-    /// 報酬デッキ: 各能力につき同一カード2枚（ペア）。能力インデックスを rank に埋め込む。
-    /// スートは見た目の差し色のみ（ペア判定は能力IDで行う）。
+    /// 報酬デッキ: 各効果カードにつき1枚。ペアは作らない（台パン3回後の表向きカードを読み取って確定する）。
+    /// rank には効果インデックスを埋め込み、スートは見た目の差し色のみ。
     static func makeRewardDeck(specs: [RewardCardSpec], shuffled: Bool = true) -> [Card] {
-        let deck = specs.enumerated().flatMap { index, spec -> [Card] in
-            let suits: [Suit] = [.spades, .hearts]
-            return suits.map { suit in
-                Card(rank: index, suit: suit, abilityId: spec.abilityId, rewardName: spec.name)
-            }
+        let deck = specs.enumerated().map { index, spec in
+            Card(rank: index, suit: .spades, effectId: spec.effectId, label: spec.label)
         }
         return shuffled ? deck.shuffled() : deck
     }

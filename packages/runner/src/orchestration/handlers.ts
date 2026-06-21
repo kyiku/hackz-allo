@@ -1,15 +1,12 @@
 import {
-  getAbility,
-  type Ability,
+  applyEffects,
+  clampAssignments,
   type ConnectErrorReason,
   type Enemy,
   type IssueDraft,
   type LoadoutTuning,
-  type Reward,
-  type RewardKind,
 } from '@github-issue-rpg/shared'
 import type { StructuredGenerator } from '../ai/structured-generator.js'
-import type { EquipmentRepository } from '../db/repositories/equipment-repository.js'
 import type { LoadoutRepository } from '../db/repositories/loadout-repository.js'
 import type { PlayerRepository } from '../db/repositories/player-repository.js'
 import { buildPlayerStatusEvent } from '../loadout/projection.js'
@@ -24,13 +21,6 @@ import {
 } from '../world/index.js'
 import type { BackendClient } from './backend-client.js'
 import type { JobHandlers } from './dispatcher.js'
-
-/** 能力種別を装備（報酬）の kind へ対応づける（表示上の区別。実効果は abilityId が担う）。 */
-function rewardKindForAbility(kind: Ability['kind']): RewardKind {
-  if (kind === 'mcp') return 'armor'
-  if (kind === 'plugin') return 'weapon'
-  return 'skill'
-}
 
 /** GitHub取得エラーのHTTPステータスを connect.error の reason へ分類する。 */
 function classifyConnectError(error: unknown): ConnectErrorReason {
@@ -59,7 +49,6 @@ export interface JobContext {
   backend: BackendClient
   players: PlayerRepository
   loadouts: LoadoutRepository
-  equipment: EquipmentRepository
   /** 構造化生成器（既定は Agent SDK = サブスク認証。酒場の issue 案生成等に使う）。 */
   generator: StructuredGenerator
   /** open issue を取得する（repo接続＝ワールド生成に使う。PATは内部に閉じる）。 */
@@ -91,7 +80,7 @@ export function createJobHandlers(ctx: JobContext): JobHandlers {
     throw new JobNotImplementedError(type)
   }
 
-  /** 現在のプレイヤー状態/編成/装備を player.status として配信する。 */
+  /** 現在のプレイヤー状態/編成を player.status として配信する。 */
   async function emitPlayerStatus(): Promise<void> {
     const player = ctx.players.findById(ctx.playerId)
     if (!player) {
@@ -101,8 +90,7 @@ export function createJobHandlers(ctx: JobContext): JobHandlers {
     if (!loadout) {
       throw new Error(`Loadout not found: player=${ctx.playerId}`)
     }
-    const equipment = ctx.equipment.listByPlayer(ctx.playerId)
-    await ctx.backend.emit(buildPlayerStatusEvent(player, loadout, equipment))
+    await ctx.backend.emit(buildPlayerStatusEvent(player, loadout))
   }
 
   return {
@@ -150,27 +138,23 @@ export function createJobHandlers(ctx: JobContext): JobHandlers {
       ctx.session.enemyIssueNumbers.add(created.number)
     },
 
-    async onLoadoutEquip(equipmentId: number, equipped: boolean): Promise<void> {
+    async onLoadoutTune(tuning: LoadoutTuning): Promise<void> {
       const loadout = ctx.loadouts.getByPlayer(ctx.playerId)
-      if (!loadout) {
-        throw new Error(`Loadout not found: player=${ctx.playerId}`)
-      }
-      const equippedIds = equipped
-        ? [...new Set([...loadout.equippedIds, equipmentId])]
-        : loadout.equippedIds.filter((id) => id !== equipmentId)
-      ctx.loadouts.update(ctx.playerId, { equippedIds, partySize: loadout.partySize })
+      if (!loadout) throw new Error(`Loadout not found: player=${ctx.playerId}`)
+      const next = clampAssignments({
+        ...loadout,
+        partySize: tuning.partySize ?? loadout.partySize,
+        selectedModelTier: tuning.modelTier ?? loadout.selectedModelTier,
+      })
+      ctx.loadouts.update(ctx.playerId, next)
       await emitPlayerStatus()
     },
 
-    async onLoadoutTune(tuning: LoadoutTuning): Promise<void> {
+    async onLoadoutMcp(refs: string[]): Promise<void> {
       const loadout = ctx.loadouts.getByPlayer(ctx.playerId)
-      if (!loadout) {
-        throw new Error(`Loadout not found: player=${ctx.playerId}`)
-      }
-      // Loadout に永続化できるのは partySize のみ。effort/model/permissionMode は
-      // 次戦の query() 実行時設定であり、編成テーブルには保存しない（design.md §8.9）。
-      const partySize = tuning.partySize ?? loadout.partySize
-      ctx.loadouts.update(ctx.playerId, { equippedIds: loadout.equippedIds, partySize })
+      if (!loadout) throw new Error(`Loadout not found: player=${ctx.playerId}`)
+      const next = clampAssignments({ ...loadout, enabledMcpRefs: refs })
+      ctx.loadouts.update(ctx.playerId, next)
       await emitPlayerStatus()
     },
 
@@ -201,33 +185,12 @@ export function createJobHandlers(ctx: JobContext): JobHandlers {
       }
     },
 
-    async onRewardClaim(abilityIds: string[]): Promise<void> {
-      // 神経衰弱で当てた能力を装備として付与し、即座に装備状態にする（次戦のAIに効く）。
-      // カタログに無いIDは無視する（不正な強化を弾く）。
-      const now = new Date().toISOString()
-      const newEquipmentIds: number[] = []
-      for (const id of abilityIds) {
-        const ability = getAbility(id)
-        if (!ability) continue
-        const reward: Reward = {
-          kind: rewardKindForAbility(ability.kind),
-          name: ability.displayName,
-          description: ability.description,
-          abilityId: ability.id,
-        }
-        const equipment = ctx.equipment.createFromReward(ctx.playerId, reward, now)
-        newEquipmentIds.push(equipment.id)
-      }
-      if (newEquipmentIds.length === 0) {
-        await emitPlayerStatus()
-        return
-      }
+    async onRewardClaim(effectIds: string[]): Promise<void> {
+      // 台パン3回後に表向きだったカードの効果を loadout の枠へ反映する（合算・クランプは applyEffects）。
       const loadout = ctx.loadouts.getByPlayer(ctx.playerId)
-      if (!loadout) {
-        throw new Error(`Loadout not found: player=${ctx.playerId}`)
-      }
-      const equippedIds = [...new Set([...loadout.equippedIds, ...newEquipmentIds])]
-      ctx.loadouts.update(ctx.playerId, { equippedIds, partySize: loadout.partySize })
+      if (!loadout) throw new Error(`Loadout not found: player=${ctx.playerId}`)
+      const next = applyEffects(loadout, effectIds)
+      ctx.loadouts.update(ctx.playerId, next)
       await emitPlayerStatus()
     },
   }

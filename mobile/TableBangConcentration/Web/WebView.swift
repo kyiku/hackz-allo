@@ -2,8 +2,8 @@ import SwiftUI
 import WebKit
 
 /// Web アプリ（Issue RPG）と双方向にやり取りするブリッジ。
-/// - JS → ネイティブ: `window.webkit.messageHandlers.bridge.postMessage({type:'reward.start', abilities:[{id,name}]})`
-/// - ネイティブ → JS: `window.__claimRewards([abilityId,...])` を evaluateJavaScript で呼ぶ
+/// - JS → ネイティブ: `window.webkit.messageHandlers.bridge.postMessage({type:'reward.start', cards:[{effectId,label}]})`
+/// - ネイティブ → JS: `window.__claimRewards([effectId,...])` を evaluateJavaScript で呼ぶ
 /// WKWebView を所有し続けるので、報酬ゲームをオーバーレイしても接続/状態が保たれる。
 final class WebBridge: NSObject, ObservableObject, WKScriptMessageHandler {
     let webView: WKWebView
@@ -35,10 +35,10 @@ final class WebBridge: NSObject, ObservableObject, WKScriptMessageHandler {
         webView.reloadFromOrigin()
     }
 
-    /// 獲得した強化能力IDを Web に渡す（Web 側が cmd.reward.claim を送る）。
-    func claimRewards(_ abilityIds: [String]) {
+    /// 獲得した効果IDを Web に渡す（Web 側が cmd.reward.claim を送る）。
+    func claimRewards(_ effectIds: [String]) {
         let json =
-            (try? JSONSerialization.data(withJSONObject: abilityIds))
+            (try? JSONSerialization.data(withJSONObject: effectIds))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         webView.evaluateJavaScript("window.__claimRewards && window.__claimRewards(\(json))")
     }
@@ -52,10 +52,11 @@ final class WebBridge: NSObject, ObservableObject, WKScriptMessageHandler {
             let dict = message.body as? [String: Any],
             dict["type"] as? String == "reward.start"
         else { return }
-        let abilities = (dict["abilities"] as? [[String: Any]]) ?? []
-        let specs = abilities.compactMap { entry -> RewardCardSpec? in
-            guard let id = entry["id"] as? String, let name = entry["name"] as? String else { return nil }
-            return RewardCardSpec(abilityId: id, name: name)
+        let cards = (dict["cards"] as? [[String: Any]]) ?? []
+        let specs = cards.compactMap { entry -> RewardCardSpec? in
+            guard let effectId = entry["effectId"] as? String,
+                  let label = entry["label"] as? String else { return nil }
+            return RewardCardSpec(effectId: effectId, label: label)
         }
         DispatchQueue.main.async { [weak self] in self?.onRewardStart?(specs) }
     }

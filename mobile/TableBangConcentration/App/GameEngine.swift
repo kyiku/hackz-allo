@@ -32,10 +32,11 @@ final class GameEngine: ObservableObject {
     /// 報酬モードの報酬カード仕様（nil なら通常の神経衰弱）。
     private let rewardSpecs: [RewardCardSpec]?
 
-    /// 報酬モードで獲得した強化能力ID（クリア時に取り出す）。
-    var acquiredAbilityIds: [String] { cardManager.collectedAbilityIds }
+    /// 報酬モードで獲得した効果ID（クリア時＝台パン3回後の表向きカードから取り出す）。
+    var acquiredEffectIds: [String] { cardManager.faceUpEffectIds() }
 
-    /// 報酬モードの GameEngine を作る（3回振り下ろし上限＋報酬カード）。
+    /// 報酬モードの GameEngine を作る（3回振り下ろし上限＋効果カード）。
+    /// 3回目の台パン（＋3秒バッファ）後、表向きのカードの効果を獲得する。
     /// 札数が少ないので、視認性のためカードを大きめ＆間隔広めにする。
     static func reward(specs: [RewardCardSpec], maxSwings: Int = 3) -> GameEngine {
         var config = GameConfig.default

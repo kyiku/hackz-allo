@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { registerClaimHandler, rewardCandidates, startRewardGame } from '../native/rewardBridge'
+import { registerClaimHandler, rewardEffectCards, startRewardGame } from '../native/rewardBridge'
 import { BattleScreen } from '../battle/BattleScreen'
 import { BlacksmithPanel } from '../blacksmith/BlacksmithPanel'
 import { ConnectedRepoConnectPanel } from '../connect/RepoConnectPanel'
@@ -77,8 +77,8 @@ export function WorldScreen() {
   const sendRef = useRef(send)
   sendRef.current = send
   useEffect(() => {
-    registerClaimHandler((abilityIds) => {
-      if (abilityIds.length > 0) sendRef.current({ type: 'cmd.reward.claim', abilityIds })
+    registerClaimHandler((effectIds) => {
+      if (effectIds.length > 0) sendRef.current({ type: 'cmd.reward.claim', effectIds })
     })
   }, [])
 
@@ -88,7 +88,7 @@ export function WorldScreen() {
     for (const battle of battleList) {
       if (battle.status !== 'defeated' || rewardedBattles.current.has(battle.battleId)) continue
       rewardedBattles.current.add(battle.battleId)
-      startRewardGame(rewardCandidates(battle.enemyId))
+      startRewardGame(rewardEffectCards(battle.enemyId))
     }
   }, [battleList])
 

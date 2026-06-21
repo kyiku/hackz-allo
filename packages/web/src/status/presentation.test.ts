@@ -1,32 +1,26 @@
-import type { Equipment, Loadout } from '@github-issue-rpg/shared'
 import { describe, expect, it } from 'vitest'
-import { abilityLabel, isEquipped } from './presentation'
+import { toggleMcpRef } from './presentation'
 
-const loadout: Loadout = { equippedIds: [1, 3], partySize: 2 }
+describe('toggleMcpRef', () => {
+  it('未選択の ref を枠内なら追加する', () => {
+    expect(toggleMcpRef(['github'], 'context7', 2)).toEqual(['github', 'context7'])
+  })
 
-describe('isEquipped', () => {
-  it('装備中IDを真と判定する', () => {
-    expect(isEquipped(1, loadout)).toBe(true)
-    expect(isEquipped(3, loadout)).toBe(true)
+  it('選択済みの ref は枠に関係なく外す', () => {
+    expect(toggleMcpRef(['github', 'context7'], 'github', 2)).toEqual(['context7'])
   })
-  it('非装備/loadout未取得は偽', () => {
-    expect(isEquipped(2, loadout)).toBe(false)
-    expect(isEquipped(1, null)).toBe(false)
-  })
-})
 
-describe('abilityLabel', () => {
-  function equip(abilityId: string | null): Equipment {
-    return { id: 1, kind: 'skill', name: '表示名', abilityId }
-  }
+  it('枠を超える追加は元の配列を保つ', () => {
+    expect(toggleMcpRef(['github', 'context7'], 'sqlite', 2)).toEqual(['github', 'context7'])
+  })
 
-  it('カタログ登録済み能力の表示名を返す', () => {
-    expect(abilityLabel(equip('ability.tdd-skill'))).toBe('TDDの心得')
+  it('mcpSlots=0 では何も追加できない', () => {
+    expect(toggleMcpRef([], 'github', 0)).toEqual([])
   })
-  it('能力なしは null', () => {
-    expect(abilityLabel(equip(null))).toBeNull()
-  })
-  it('カタログ未登録は null', () => {
-    expect(abilityLabel(equip('ability.unknown'))).toBeNull()
+
+  it('入力配列を破壊しない（イミュータブル）', () => {
+    const refs = ['github']
+    toggleMcpRef(refs, 'context7', 2)
+    expect(refs).toEqual(['github'])
   })
 })

@@ -102,11 +102,6 @@ describe('parseClientEvent', () => {
     expect(parseClientEvent(event)).toEqual(event)
   })
 
-  it('cmd.loadout.equip をパースする', () => {
-    const event = { type: 'cmd.loadout.equip', equipmentId: 3, equipped: true }
-    expect(parseClientEvent(event)).toEqual(event)
-  })
-
   it('cmd.loadout.tune をパースする', () => {
     const event = { type: 'cmd.loadout.tune', tuning: { effort: 'high', partySize: 2 } }
     expect(parseClientEvent(event)).toEqual(event)
@@ -134,21 +129,27 @@ describe('parseClientEvent', () => {
 })
 
 describe('player.status', () => {
-  it('equipment コレクションを含めてパースする', () => {
+  it('player と loadout のみでパースする（equipment 廃止）', () => {
     const event = {
       type: 'player.status',
       player: { id: 1, level: 2, exp: 120 },
-      loadout: { equippedIds: [3], partySize: 1 },
-      equipment: [{ id: 3, kind: 'weapon', name: '黒曜のリンタ', abilityId: 'ability.tdd-skill' }],
+      loadout: { partySize: 1, mcpSlots: 0, partySlots: 1, modelTierMax: 0, enabledMcpRefs: [], selectedModelTier: 0 },
     }
     expect(parseServerEvent(event)).toEqual(event)
   })
 
-  it('equipment が欠けていれば拒否する', () => {
+  it('player が欠けていれば拒否する', () => {
+    const event = {
+      type: 'player.status',
+      loadout: { partySize: 1, mcpSlots: 0, partySlots: 1, modelTierMax: 0, enabledMcpRefs: [], selectedModelTier: 0 },
+    }
+    expect(() => parseServerEvent(event)).toThrow()
+  })
+
+  it('loadout が欠けていれば拒否する', () => {
     const event = {
       type: 'player.status',
       player: { id: 1, level: 2, exp: 120 },
-      loadout: { equippedIds: [], partySize: 1 },
     }
     expect(() => parseServerEvent(event)).toThrow()
   })

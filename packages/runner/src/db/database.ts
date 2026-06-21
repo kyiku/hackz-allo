@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import { SCHEMA_SQL } from './schema.js'
+import { LOADOUT_MIGRATION_COLUMNS, SCHEMA_SQL } from './schema.js'
 
 /** better-sqlite3 の Database 型エイリアス。 */
 export type Db = Database.Database
@@ -16,5 +16,11 @@ export function createDatabase(path: string): Db {
   const db = new Database(path)
   db.pragma('foreign_keys = ON')
   db.exec(SCHEMA_SQL)
+  const cols = new Set(
+    (db.prepare('PRAGMA table_info(loadouts)').all() as { name: string }[]).map((c) => c.name),
+  )
+  for (const m of LOADOUT_MIGRATION_COLUMNS) {
+    if (!cols.has(m.name)) db.exec(m.ddl)
+  }
   return db
 }
