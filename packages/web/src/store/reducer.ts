@@ -4,7 +4,6 @@ import type {
   BattleStatus,
   ConnectErrorReason,
   Enemy,
-  Equipment,
   IssueDraft,
   Loadout,
   NpcDialogue,
@@ -49,9 +48,8 @@ export interface GameData {
   enemies: Record<number, Enemy>
   battles: Record<string, BattleView>
   player: Player | null
+  /** プレイヤーの編成（強化効果を適用した拡張 Loadout を保持）。 */
   loadout: Loadout | null
-  /** 所有している装備コレクション（player.status で配信）。 */
-  equipment: Equipment[]
   assignments: Assignment[]
   /** 酒場で生成中の issue 案（未生成は null）。 */
   tavernDraft: IssueDraft | null
@@ -67,7 +65,6 @@ export const initialGameData: GameData = {
   battles: {},
   player: null,
   loadout: null,
-  equipment: [],
   assignments: [],
   tavernDraft: null,
   connectError: null,
@@ -192,7 +189,6 @@ export function applyServerEvent(state: GameData, event: ServerEvent): GameData 
         ...state,
         player: event.player,
         loadout: event.loadout,
-        equipment: event.equipment,
       }
 
     case 'world.assignments':
