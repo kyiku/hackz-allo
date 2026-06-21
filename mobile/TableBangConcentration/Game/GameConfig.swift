@@ -62,7 +62,7 @@ extension GameConfig {
         // 検出が一瞬途切れても着地として成立させる（maxSampleGapを広げる）。
         swingVelocityThreshold: 0.55,
         velocityForMaxPower: 2.4,
-        punchCooldown: 0.45,
+        punchCooldown: 2.0,
         maxSampleGap: 0.35,
         nominalHandDepth: 0.5,
         depthToMetersFactor: 1.2,
