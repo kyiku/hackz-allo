@@ -1,16 +1,19 @@
-import { getAbility, type Equipment, type Loadout } from '@github-issue-rpg/shared'
-
-/** 指定装備が現在装備中か。 */
-export function isEquipped(equipmentId: number, loadout: Loadout | null): boolean {
-  return loadout?.equippedIds.includes(equipmentId) ?? false
-}
+/**
+ * ステータス画面(賢者の家)の表示ロジック。
+ * 装備所有は廃止し、神経衰弱で得た「枠(容量)」へ MCP/モデル/サブエージェントを割り当てる。
+ */
 
 /**
- * 装備が紐づく実能力の表示名（固定カタログ参照）。
- * 表示名はLLM生成でも実能力はカタログに限定される（design.md §8.5）。
- * 能力なし、またはカタログ未登録なら null。
+ * MCP ref のトグル結果を返す（イミュータブル）。
+ * 選択を外す場合は常に許可。選択を追加する場合は `mcpSlots` を超えない範囲でのみ許可し、
+ * 上限超過時は元の配列をそのまま返す。
  */
-export function abilityLabel(equipment: Equipment): string | null {
-  if (!equipment.abilityId) return null
-  return getAbility(equipment.abilityId)?.displayName ?? null
+export function toggleMcpRef(refs: readonly string[], ref: string, mcpSlots: number): string[] {
+  if (refs.includes(ref)) {
+    return refs.filter((r) => r !== ref)
+  }
+  if (refs.length >= mcpSlots) {
+    return [...refs]
+  }
+  return [...refs, ref]
 }
